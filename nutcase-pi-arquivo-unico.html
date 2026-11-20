@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nutcase P.I.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Old+Standard+TT:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: noir, silencioso; o detetive fala muito, o mundo pouco
+   IDEA: uma TV de tubo antiga exibindo um caso que talvez seja sobre quem assiste
+   PICTURE: Vila Serena em pixel art, chuva, postes, terra vermelha
+   COLOUR and TYPE: noite verde-azulada, luz de poste #e8d9a0, sangue #b23a2e; VT323 + Old Standard no jornal
+   LAYOUT: tela no topo, diálogo e controles embaixo, painéis e cenas cobrindo tudo */
+:root{color-scheme:dark;--bg:#07080b;--ink:#d9d2bf;--dim:#8a8778;--lamp:#e8d9a0;--blood:#b23a2e;--panel:#101318;--line:#2a2f36}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:20px/1.25 'VT323',monospace;overflow-x:clip}
+html,body{height:100%;overflow:hidden}
+#game{position:relative;width:100vw;height:100vh;height:100dvh;display:flex;flex-direction:column;background:#000;transform-origin:center;overflow:hidden}
+#screen{position:relative;width:100%;flex:1 1 auto;min-height:0;background:#000;overflow:hidden}
+#side{display:flex;flex-direction:column;flex:none}
+canvas{width:100%;height:100%;display:block;object-fit:contain;image-rendering:pixelated;transition:transform 1.6s ease-in}
+#screen::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.07) 0 1px,transparent 1px 4px)}
+#hud{position:absolute;top:6px;left:8px;right:8px;display:flex;justify-content:space-between;font-size:clamp(14px,3.4vw,22px);color:var(--lamp);text-shadow:1px 1px 0 #000;pointer-events:none}
+#fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .45s}
+#side{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow-y:auto;background:#0b0d11}
+#dlg{flex:1 0 auto;min-height:104px;padding:10px 14px;border-top:2px solid var(--line);background:linear-gradient(#12151b,#0d1014);cursor:pointer;user-select:none}
+#talk{display:none;padding:8px 12px 12px;background:linear-gradient(rgba(6,7,10,0),rgba(6,7,10,.88) 28%)}
+#game.talking #talk{display:block}#game.talking #dlg,#game.talking #pad,#game.talking #menu,#game.talking #hint{display:none}
+#tLine{font-size:19px;line-height:1.25;min-height:2.5em;max-width:820px;margin:0 auto 6px;text-shadow:1px 1px 0 #000}#tWho{color:var(--lamp);font-weight:400}
+#tChoices{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:860px;margin:0 auto}#tChoices.wait{opacity:.4;pointer-events:none}
+#tChoices button{min-height:36px;font-size:15px;padding:2px 12px;border-radius:18px;background:rgba(26,30,37,.85)}#tChoices button.bad{border-color:#6a2a24;color:#e0a090}
+#tForm[hidden],#tChoices[hidden]{display:none!important}#tForm{display:flex;gap:6px;max-width:820px;margin:0 auto}#tForm input{flex:1;min-height:40px;font-size:18px;padding:4px 10px;background:rgba(10,12,16,.9)}#tForm button{min-height:40px}
+@media(orientation:landscape){#talk{position:absolute;left:0;right:0;bottom:0;padding:22px max(14px,env(safe-area-inset-left)) max(10px,env(safe-area-inset-bottom))}}
+@media(orientation:landscape) and (max-height:520px){#tLine{font-size:16px;min-height:2.4em;margin-bottom:4px}#tChoices button{min-height:30px;font-size:13px;padding:1px 9px}#talk{padding-top:14px}}
+@media(orientation:portrait){#game.talking #talk{flex:1;background:#0b0d11}}
+#pad,#menu{transition:opacity .4s}#game.cine #pad,#game.cine #menu{opacity:.12;pointer-events:none}#dlg{transition:opacity .35s}#dlg.hidden{opacity:0;pointer-events:none}
+#shock{position:absolute;left:0;right:0;top:38%;text-align:center;font-size:clamp(34px,8vw,84px);color:#f0e4c0;letter-spacing:6px;opacity:0;pointer-events:none;text-shadow:3px 0 0 rgba(255,40,40,.7),-3px 0 0 rgba(40,200,255,.6),0 0 30px rgba(0,0,0,.9)}
+#shock.show{animation:shk 3.2s ease-out forwards}@keyframes shk{0%{opacity:0;transform:scale(1.4);filter:blur(8px)}12%{opacity:1;transform:scale(1);filter:blur(0)}75%{opacity:.9}100%{opacity:0;transform:scale(.96);filter:blur(4px)}}
+#qte{position:absolute;inset:0;z-index:6;display:none;flex-direction:column;justify-content:center;align-items:center;gap:20px;pointer-events:none;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 30%,rgba(120,0,0,.35) 100%)}
+#qte.show{display:flex}#qte .ql{font-size:clamp(34px,8vw,72px);color:#ffd060;text-shadow:0 0 18px #f00,2px 2px 0 #000;animation:bl .35s infinite}
+#qte .qb{display:flex;gap:40vw;pointer-events:auto}#qte button{width:96px;height:96px;border-radius:50%;font-size:40px;background:rgba(20,20,24,.7);border:3px solid #555}#qte button.hot{border-color:#ffd060;box-shadow:0 0 24px #ffb020;color:#ffd060}
+#who{color:var(--lamp);font-size:18px;letter-spacing:.5px}#txt{font-size:21px;min-height:48px;text-shadow:1px 1px 0 #000}#more{float:right;color:var(--dim);font-size:16px}
+#pad{display:grid;grid-template-columns:auto 1fr;gap:8px;padding:10px 12px 6px}
+#move,#act{display:grid;grid-auto-flow:column;gap:8px}#move button{width:60px}
+#menu{display:grid;grid-template-columns:repeat(4,1fr) 52px;gap:6px;padding:4px 12px 12px}#menu button{font-size:16px;min-height:42px;padding:2px 4px}
+button{font:inherit;font-size:19px;color:var(--ink);background:#1a1e25;border:2px solid var(--line);border-radius:6px;min-height:48px;padding:4px 10px;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+button:active,button.on{background:#2a2f38;border-color:var(--lamp)}button:focus-visible{outline:2px solid var(--lamp)}
+button.go{background:#3a2a1a;border-color:#7a5a30;color:var(--lamp)}
+#hint{font-size:15px;color:var(--dim);text-align:center;min-height:18px;padding:0 10px}
+#rot{display:none;font-size:15px;color:var(--dim);text-align:center;padding:0 12px 10px}
+@media(orientation:portrait){#screen{flex:none;height:auto;aspect-ratio:4/3}#screen canvas{object-fit:cover}#rot{display:block}}
+@media(orientation:landscape){
+ #game{display:block}#screen{position:absolute;inset:0;height:auto}
+ #side{position:absolute;inset:0;background:none;overflow:visible;pointer-events:none;display:block}
+ #side>*{pointer-events:auto}
+ #dlg{position:absolute;left:50%;transform:translateX(-50%);bottom:max(10px,env(safe-area-inset-bottom));width:min(760px,calc(100% - 330px));min-height:0;max-height:38%;overflow-y:auto;border:2px solid #3a3f48;border-radius:8px;background:rgba(9,11,15,.84);backdrop-filter:blur(2px)}
+ #pad{position:absolute;inset:auto 0 0 0;padding:0 max(12px,env(safe-area-inset-left)) max(12px,env(safe-area-inset-bottom));display:flex;justify-content:space-between;align-items:flex-end;pointer-events:none}
+ #move,#act{pointer-events:auto;grid-auto-flow:row;grid-template-columns:repeat(2,auto)}#act{grid-template-columns:auto}
+ #move button{width:62px;height:62px;border-radius:50%;background:rgba(20,24,30,.7);font-size:22px}
+ #act button{width:132px;min-height:50px;background:rgba(26,30,37,.8)}#act button.go{background:rgba(58,42,26,.88)}
+ #menu{position:absolute;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));padding:0;display:flex;gap:6px}
+ #menu button{min-height:38px;font-size:15px;padding:2px 10px;background:rgba(20,24,30,.75)}
+ #hint{position:absolute;right:max(12px,env(safe-area-inset-right));left:auto;bottom:130px;text-align:right;color:var(--lamp);text-shadow:1px 1px 0 #000;pointer-events:none;white-space:nowrap;max-width:300px;overflow:hidden;text-overflow:ellipsis}
+ #hud{top:max(8px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));right:auto;flex-direction:column;gap:2px;font-size:18px}
+}
+@media(orientation:landscape) and (max-height:520px){#dlg{width:calc(100% - 300px);max-height:44%;padding:6px 10px}#who{font-size:15px}#txt{font-size:17px;min-height:0}#move button{width:52px;height:52px}#act button{width:108px;min-height:44px;font-size:16px}#menu button{min-height:32px;font-size:13px;padding:2px 7px}#hint{display:none}}
+.pan{position:absolute;inset:0;z-index:5;background:rgba(5,6,9,.95);display:none;flex-direction:column;padding:14px;overflow:auto}
+.pan.show{display:flex}
+.pan h2{margin:0 0 6px;font-weight:400;font-size:30px;color:var(--lamp);line-height:1.05;padding-right:90px}
+.pan .x{position:absolute;top:10px;right:10px;min-height:40px}
+.sub{color:var(--dim);font-size:17px}
+.log{flex:1;overflow:auto;border:2px solid var(--line);padding:8px;background:#0b0d11;min-height:180px;margin:8px 0}
+.log p{margin:0 0 8px}.log b{color:var(--lamp);font-weight:400}.log .me b{color:#8fb3c9}.log .sys{color:var(--dim)}
+.row{display:flex;gap:8px}.row input{flex:1}
+input{font:inherit;font-size:20px;color:var(--ink);background:#0b0d11;border:2px solid var(--line);border-radius:4px;padding:8px;min-height:48px;width:100%}
+input:focus{outline:2px solid var(--lamp)}
+.trust{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:6px}
+.trust span{font-size:clamp(12px,3vw,15px);overflow:hidden;white-space:nowrap;text-align:center;padding:4px 0;border:2px solid var(--line);color:var(--dim)}
+.trust span.on{border-color:var(--lamp);color:#111;background:var(--lamp)}
+.bar{height:8px;background:#1a1e25;margin-top:4px}.bar i{display:block;height:100%;background:var(--blood);transition:width .5s}
+.full{position:absolute;inset:0;z-index:8;display:flex;flex-direction:column;justify-content:safe center;overflow-y:auto;align-items:center;text-align:center;padding:20px;background:radial-gradient(ellipse at 50% 30%,#1a2422 0,#07080b 70%)}
+#title h1,.cred h1{font-weight:400;font-size:clamp(46px,11vw,96px);margin:0;letter-spacing:2px;color:var(--lamp);line-height:1;text-shadow:3px 3px 0 #3a1512}
+#title p,#setup p{color:var(--dim);margin:6px 0 18px;max-width:36ch}
+#title .btns{display:grid;gap:10px;width:min(300px,100%)}
+#setup form{display:grid;gap:10px;width:min(360px,100%)}
+#setup label{text-align:left;font-size:17px;color:var(--dim)}
+.wallet{margin:12px auto;width:min(440px,100%);background:#4a3020;border:3px solid #2a1a10;border-radius:10px;padding:14px;box-shadow:inset 0 0 0 2px #6a4a30}
+.wallet .in{display:grid;grid-template-columns:110px 1fr;gap:12px;background:#2a1c14;border-radius:6px;padding:12px}
+.badge{width:100%;aspect-ratio:1}
+.idc{background:#d8cfb4;color:#222;padding:8px;border-radius:3px;font-size:17px;line-height:1.15}
+.idc b{font-weight:400;font-size:21px;display:block}
+.note{grid-column:1/-1;background:#e6dcc0;color:#3a2a20;padding:8px;transform:rotate(-1deg);font-size:17px}
+.clue{border:2px solid var(--line);padding:8px;margin:0 0 8px;background:#0b0d11}.clue b{color:var(--lamp);font-weight:400}
+.chap{color:var(--blood);margin:14px 0 6px;font-size:19px}
+.q{margin:10px 0}.q .opts{display:grid;gap:6px;margin-top:6px}.q.ok{opacity:.65}
+.keys{display:grid;grid-template-columns:repeat(3,64px);gap:8px;justify-content:center;margin-top:12px}
+.code{font-size:44px;text-align:center;letter-spacing:12px;color:var(--lamp);margin-top:10px}
+.wall{background:#4a4430;color:#1a1810;padding:12px;font-size:21px;line-height:1.3;margin:10px 0;transform:rotate(-.6deg)}
+.wall em{color:#9b1f1a;font-style:normal;font-size:26px}
+.seq{min-height:30px;color:var(--lamp);margin:8px 0}
+.opts{display:grid;gap:8px;margin-top:10px}
+#ov{position:absolute;inset:0;z-index:7;display:none;cursor:pointer}
+#ov.show{display:flex}
+.card{flex:1;background:#000;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;font-size:clamp(24px,5vw,38px);color:var(--lamp);line-height:1.15;animation:fi .8s}
+.paperw{flex:1;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px;flex-direction:column;gap:12px}
+.paper{background:#e8e0c8;color:#1a1612;max-width:520px;width:100%;padding:18px;font-family:'Old Standard TT',serif;transform:rotate(-1.2deg);box-shadow:6px 8px 0 rgba(0,0,0,.5);animation:fi 1s}
+.paper .mast{text-align:center;border-bottom:3px double #1a1612;font-weight:700;font-size:28px;letter-spacing:1px}
+.paper .date{text-align:center;font-size:13px;border-bottom:1px solid #1a1612;padding:3px 0;margin-bottom:10px}
+.paper h3{font-size:clamp(22px,5vw,32px);line-height:1.05;margin:4px 0 10px}
+.paper p{font-size:16px;line-height:1.4;margin:0;column-count:2;column-gap:16px}
+@media(max-width:600px){.paper p{column-count:1}}
+.choicew{flex:1;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:12px;text-align:center;cursor:default}
+.choicew h2{font-weight:400;color:var(--lamp);font-size:34px;margin:0 0 8px}
+.choicew button{width:min(420px,100%);font-size:21px;min-height:60px}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+#end{display:none;background:#000;overflow:auto;justify-content:flex-start;padding-top:40px}
+.cred p{color:var(--dim);margin:12px 0}.cred p b{color:var(--ink);font-weight:400}
+.file{border:2px solid var(--blood);padding:16px;max-width:440px;text-align:left;margin:16px auto}
+.file b{color:var(--blood);font-weight:400}
+.blink{animation:bl 1.4s infinite;color:var(--lamp)!important}@keyframes bl{50%{opacity:.2}}
+.tvoff{animation:tv 1.1s forwards}
+@keyframes tv{0%{transform:scale(1);filter:brightness(1)}40%{transform:scale(1,.004);filter:brightness(4)}70%{transform:scale(.3,.004)}100%{transform:scale(0,0);filter:brightness(0)}}
+@media(max-width:600px){button{font-size:17px}#txt{font-size:19px}}
+@media(prefers-reduced-motion:reduce){.tvoff{animation:none;opacity:0}.card,.paper{animation:none}canvas{transition:none}}
+</style></head><body>
+<div id="game">
+ <div id="screen"><canvas id="c" width="1280" height="720"></canvas>
+  <div id="shock"></div>
+  <div id="hud"><span id="hudL">DIA 1/30</span><span id="hudR"></span></div><div id="fade"></div>
+ </div>
+ <div id="side">
+ <div id="dlg" class="hidden" role="button" tabindex="0" aria-live="polite"><span id="more"></span><div id="who">Nutcase P.I.</div><div id="txt"></div></div>
+ <div id="pad"><div id="move"><button id="bL" aria-label="Andar para a esquerda">◀</button><button id="bR" aria-label="Andar para a direita">▶</button></div>
+  <div id="act"><button id="bE" class="go">Examinar</button><button id="bT">Pensar</button></div></div>
+ <div id="hint"></div>
+ <div id="menu"><button id="bW">Carteira</button><button id="bN">Caderno</button><button id="bB">Teoria</button><button id="bS">Som</button><button id="bF" aria-label="Tela cheia">⛶</button></div>
+ <div id="talk"><div id="tLine"><b id="tWho"></b> <span id="tTxt"></span></div><div id="tChoices"></div><form id="tForm" hidden><input id="tIn" autocomplete="off" placeholder="Escreva…" maxlength="400"><button class="go">Enviar</button></form></div>
+ <div id="rot">Gire o celular na horizontal para jogar em tela cheia.</div>
+ </div>
+ <div class="pan" id="pChat"><button class="x" data-close>Fechar</button>
+  <h2 id="chatTitle">Pensamentos</h2><div class="sub" id="chatSub"></div>
+  <div id="trustBox" hidden><div class="trust" id="trust"></div><div class="bar"><i id="trustBar" style="width:0"></i></div></div>
+  <div class="log" id="log"></div>
+  <form class="row" id="chatForm"><input id="chatIn" autocomplete="off" placeholder="Escreva…"><button class="go">Enviar</button></form>
+ </div>
+ <div class="pan" id="pWallet"><button class="x" data-close>Fechar</button>
+  <h2>A carteira de Brandão</h2><div class="sub">Do bolso de dentro do casaco.</div>
+  <div class="wallet"><div class="in">
+   <svg class="badge" viewBox="0 0 40 40" shape-rendering="crispEdges" aria-label="Distintivo"><path fill="#9aa3a8" d="M20 2l5 9 10 1-7 7 2 10-10-5-10 5 2-10-7-7 10-1z"/><path fill="#cfd6d8" d="M20 6l3 7 7 1-5 5 1 7-6-3z"/><circle cx="20" cy="19" r="5" fill="#6a7276"/><text x="20" y="38" font-size="5" text-anchor="middle" fill="#cfd6d8" font-family="VT323">0451</text></svg>
+   <div class="idc"><b>Otávio Brandão</b>Detetive · Delegacia de Vila Serena<br>Matrícula 0451<br>Altura 1,82 · Olhos castanhos<br>Fuma, mas diz que parou.</div>
+   <div class="note">Bilhete dobrado: “Volte cedo pra casa. Você sempre esquece que alguém espera. — M.”</div>
+  </div></div>
+  <div class="clue"><b>O que ele já sabe sobre você</b><div id="aboutYou" style="margin-top:4px"></div></div>
+ </div>
+ <div class="pan" id="pNote"><button class="x" data-close>Fechar</button><h2>Caderno de pistas</h2><div id="clues"></div></div>
+ <div class="pan" id="pBoard"><button class="x" data-close>Fechar</button><h2>Montar teoria</h2>
+  <div class="sub">Cada conclusão errada custa um dia. São 30.</div><div id="qs"></div></div>
+ <div class="pan" id="pPuz"><button class="x" data-close>Fechar</button><h2 id="puzT"></h2><div class="sub" id="puzD"></div><div id="puzB"></div></div>
+ <div id="ov"></div>
+ <div id="qte"><div class="ql">DESVIE!</div><div class="qb"><button data-d="-1" aria-label="Desviar para a esquerda">◀</button><button data-d="1" aria-label="Desviar para a direita">▶</button></div></div>
+
+ <div id="title" class="full"><h1>NUTCASE P.I.</h1><p>Trinta dias. Cinco casos. Uma cidade que deixou de acreditar que existe.</p>
+  <div class="btns"><button class="go" id="start">Novo jogo</button><button id="cont" hidden>Continuar</button></div>
+  <p style="font-size:16px;margin-top:22px">Use fones. Jogue à noite. Converse com o detetive.</p></div>
+ <div id="setup" class="full" style="display:none"><h2 style="font-weight:400;color:var(--lamp);font-size:32px;margin:0">Antes de entrar no carro…</h2>
+  <p>O detetive precisa saber com quem está falando. Tudo é opcional.</p>
+  <form id="setupForm"><label>Seu nome<input id="sName" autocomplete="off"></label><label>Sua idade<input id="sAge" inputmode="numeric" autocomplete="off"></label><label>Onde você mora<input id="sCity" autocomplete="off"></label><button class="go">Entrar no caso</button></form></div>
+ <div id="end" class="full"></div>
+</div>
+<script>
+/* Nutcase P.I. · áudio: música noir composta (piano, Rhodes, contrabaixo), ambiente suave e efeitos */
+(()=>{
+const G=window.G=window.G||{};
+let ac=null,master,lpf,musicG,sfxG,ambG,rev,on=true,mode='none',amb='none',ambNodes=[],timer=null,barT=0,barI=0;
+try{on=localStorage.getItem('nutcase.som')!=='0'}catch(e){}
+const N=n=>440*Math.pow(2,(n-69)/12);
+const NM={C:0,D:2,E:4,F:5,G:7,A:9,B:11};const P=s=>{const m=s.match(/^([A-G])(#|b)?(\d)$/);return 12*(+m[3]+1)+NM[m[1]]+(m[2]==='#'?1:m[2]==='b'?-1:0)};
+function noiseBuf(sec){const b=ac.createBuffer(1,ac.sampleRate*sec,ac.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;return b}
+function init(){if(ac){if(ac.state==='suspended')ac.resume();return}
+ try{ac=new(window.AudioContext||window.webkitAudioContext)()}catch(e){return}
+ master=ac.createGain();master.gain.value=on?.85:0;lpf=ac.createBiquadFilter();lpf.type='lowpass';lpf.frequency.value=20000;lpf.connect(master);master.connect(ac.destination);
+ const comp=ac.createDynamicsCompressor();comp.threshold.value=-18;comp.ratio.value=3;comp.connect(lpf);
+ musicG=ac.createGain();musicG.gain.value=0;sfxG=ac.createGain();sfxG.gain.value=.7;ambG=ac.createGain();ambG.gain.value=.35;
+ rev=ac.createConvolver();const ir=ac.createBuffer(2,ac.sampleRate*2.6,ac.sampleRate);for(let c=0;c<2;c++){const d=ir.getChannelData(c);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,3)}rev.buffer=ir;
+ const rg=ac.createGain();rg.gain.value=.32;rev.connect(rg);rg.connect(comp);[musicG,sfxG,ambG].forEach(g=>g.connect(comp));
+ G.NB=noiseBuf(2);timer=setInterval(tick,50);setAmb(amb,true);if(mode!=='none')musicG.gain.value=.55;barT=ac.currentTime+.2;}
+function env(g,t,a,peak,d){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+a+d)}
+function osc(type,f,t,dur,peak,dest,a,wet){const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.setValueAtTime(f,t);env(g,t,a||.005,peak,dur);o.connect(g);g.connect(dest||sfxG);if(wet){const s=ac.createGain();s.gain.value=wet;g.connect(s);s.connect(rev)}o.start(t);o.stop(t+(a||.005)+dur+.05);return o}
+function noise(t,dur,peak,ftype,f,q,dest,a){const s=ac.createBufferSource();s.buffer=G.NB;const fl=ac.createBiquadFilter();fl.type=ftype||'lowpass';fl.frequency.value=f||1000;fl.Q.value=q||.7;const g=ac.createGain();env(g,t,a||.003,peak,dur);s.connect(fl);fl.connect(g);g.connect(dest||sfxG);s.start(t,Math.random()*1.5);s.stop(t+dur+(a||0)+.1)}
+/* --- instrumentos --- */
+function piano(n,t,v,dur){const f=N(n);dur=dur||1.6;osc('triangle',f,t,dur,.075*v,musicG,.006,.45);osc('sine',f,t,dur*1.2,.06*v,musicG,.004,.4);osc('sine',f*2,t,dur*.4,.018*v,musicG,.003,.3);osc('sine',f*3,t,.15,.006*v,musicG,.002)}
+function rhodes(n,t,dur,v){const f=N(n),o=ac.createOscillator(),o2=ac.createOscillator(),g=ac.createGain(),tr=ac.createOscillator(),tg=ac.createGain();o.type='sine';o2.type='sine';o.frequency.value=f;o2.frequency.value=f*2.001;
+ g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.03*v,t+.02);g.gain.exponentialRampToValueAtTime(.014*v,t+.4);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+ const g2=ac.createGain();g2.gain.value=.25;tr.frequency.value=4.5;tg.gain.value=.006*v;tr.connect(tg);tg.connect(g.gain);o.connect(g);o2.connect(g2);g2.connect(g);g.connect(musicG);const s=ac.createGain();s.gain.value=.5;g.connect(s);s.connect(rev);
+ [o,o2,tr].forEach(x=>{x.start(t);x.stop(t+dur+.05)})}
+function bass(n,t,v,dur){const f=N(n),o=ac.createOscillator(),o2=ac.createOscillator(),fl=ac.createBiquadFilter(),g=ac.createGain();o.type='triangle';o2.type='sine';o.frequency.value=f;o2.frequency.value=f;fl.type='lowpass';fl.frequency.setValueAtTime(900,t);fl.frequency.exponentialRampToValueAtTime(260,t+.25);
+ g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.2*v,t+.012);g.gain.exponentialRampToValueAtTime(.08*v,t+.18);g.gain.exponentialRampToValueAtTime(.0001,t+(dur||.8));o.connect(fl);o2.connect(fl);fl.connect(g);g.connect(musicG);[o,o2].forEach(x=>{x.start(t);x.stop(t+(dur||.8)+.05)})}
+function bell(n,t,v){osc('sine',N(n),t,1.6,.05*v,musicG,.002,.7);osc('sine',N(n)*2.76,t,.35,.012*v,musicG,.001,.5)}
+function kick(t,v){const o=osc('sine',90,t,.25,.22*v,musicG,.004);o.frequency.exponentialRampToValueAtTime(40,t+.2)}
+/* --- composição: "Vila Serena" (AABA em lá menor, 72 bpm, swing) --- */
+const CH={Am9:{r:45,q:3,v:['C4','E4','G4','B4']},Dm9:{r:38,q:3,v:['F3','A3','C4','E4']},Bm7b5:{r:35,q:3,v:['A3','D4','F4']},E7b9:{r:40,q:4,v:['G#3','D4','F4']},Fmaj7:{r:41,q:4,v:['A3','C4','E4']},Em7:{r:40,q:3,v:['G3','B3','D4']},A7:{r:45,q:4,v:['G3','C#4','E4']},G7:{r:43,q:4,v:['F3','B3','D4']},Cmaj7:{r:36,q:4,v:['E3','G3','B3']}};
+const SA=[['Am9',[['E5',0,1.5],['D5',1.5,.5],['C5',2,1],['B4',3,1]]],['Am9',[['A4',0,3]]],['Dm9',[['F5',0,1.5],['E5',1.5,.5],['D5',2,1],['C5',3,1]]],['Dm9',[['A4',0,3]]],['Bm7b5',[['D5',0,1],['F5',1,1],['A5',2,2]]],['E7b9',[['G#5',0,1],['F5',1,1],['D5',2,1],['B4',3,1]]],['Am9',[['C5',0,1.5],['B4',1.5,.5],['A4',2,2]]],['E7b9',[['B4',0,1],['G#4',1,1],['E4',2,2]]]];
+const SB=[['Fmaj7',[['A5',0,1.5],['G5',1.5,.5],['E5',2,2]]],['Fmaj7',[['C5',0,1],['E5',1,1],['A5',2,2]]],['Em7',[['G5',0,1.5],['E5',1.5,.5],['D5',2,2]]],['A7',[['C#5',0,1],['E5',1,1],['G5',2,2]]],['Dm9',[['F5',0,1.5],['E5',1.5,.5],['D5',2,1],['A4',3,1]]],['G7',[['B4',0,1],['D5',1,1],['F5',2,2]]],['Cmaj7',[['E5',0,3]]],['E7b9',[['D5',0,1],['B4',1,1],['G#4',2,2]]]];
+const SONG=[...SA,...SA,...SB,...SA];
+const sw=b=>{const f=b%1;return Math.floor(b)+(f===.5?.66:f)};
+function scheduleBar(t,i){const bpm=mode==='sad'?54:mode==='box'?62:72,spb=60/bpm,bar=SONG[i%SONG.length],c=CH[bar[0]],nx=CH[SONG[(i+1)%SONG.length][0]];
+ if(mode==='noir'){bar[1].forEach(([n,b,d])=>piano(P(n),t+sw(b)*spb,.9+Math.random()*.15,d*spb*1.4));
+  c.v.forEach(n=>{rhodes(P(n),t,spb*1.6,.9);rhodes(P(n),t+2.66*spb,spb*.9,.7)});
+  const walk=[c.r,c.r+c.q,c.r+7,nx.r+(Math.random()<.5?1:-1)];walk.forEach((n,k)=>bass(n,t+k*spb,k?.8:1,spb*.95));
+  if(i%2===0)kick(t,.5);if(Math.random()<.25){const n=P(bar[1][bar[1].length-1][0])+12;piano(n,t+3.5*spb,.35,spb)}}
+ else if(mode==='sad'){bar[1].forEach(([n,b,d])=>piano(P(n),t+b*spb,.7,d*spb*1.8));c.v.forEach(n=>rhodes(P(n),t,spb*4,.7));bass(c.r,t,.6,spb*3.5)}
+ else if(mode==='box'){if(i%SONG.length<16)bar[1].forEach(([n,b])=>bell(P(n)+12,t+b*spb,.9));if(i%2===0)c.v.forEach(n=>rhodes(P(n)-12,t,spb*8,.4))}
+ else if(mode==='tense'){rhodes(33,t,spb*4.2,1.4);rhodes(34,t,spb*4.2,1);rhodes(45,t+spb*2,spb*2.2,.8);for(let k=0;k<4;k++){kick(t+k*spb,.9);kick(t+k*spb+.22,.55)}}
+ return 4*spb}
+function tick(){if(!ac)return;if(mode!=='none'&&mode){while(barT<ac.currentTime+.6){if(barT<ac.currentTime-.5)barT=ac.currentTime+.05;barT+=scheduleBar(barT,barI++)}}else barT=ac.currentTime+.1;
+ if(amb==='rain'&&Math.random()<.0025)thunder();
+ if(amb==='fire'&&Math.random()<.4)noise(ac.currentTime+Math.random()*.05,.03+Math.random()*.05,.05+Math.random()*.1,'bandpass',900+Math.random()*2500,1.5,ambG);
+ if((amb==='rural'||amb==='orf')&&Math.random()<.05)for(let i=0;i<3;i++)osc('sine',4200+Math.random()*300,ac.currentTime+i*.06,.03,.004,ambG,.003);}
+/* --- ambiente (suave) --- */
+function stopAmb(){ambNodes.forEach(n=>{try{n.g.gain.setTargetAtTime(.0001,ac.currentTime,.4);n.s.stop(ac.currentTime+2)}catch(e){}});ambNodes=[]}
+function loop(ftype,f,vol,q){const s=ac.createBufferSource();s.buffer=G.NB;s.loop=true;const fl=ac.createBiquadFilter();fl.type=ftype;fl.frequency.value=f;fl.Q.value=q||.5;const fl2=ac.createBiquadFilter();fl2.type='highpass';fl2.frequency.value=180;const g=ac.createGain();g.gain.value=.0001;g.gain.setTargetAtTime(vol,ac.currentTime,1);s.connect(fl);fl.connect(fl2);fl2.connect(g);g.connect(ambG);s.start();ambNodes.push({s,g})}
+function setAmb(a,force){if(a===amb&&!force)return;amb=a;if(!ac)return;stopAmb();
+ if(a==='rain')loop('lowpass',1400,.07);else if(a==='rainIn')loop('lowpass',500,.04);else if(a==='rural'||a==='orf'||a==='forest')loop('bandpass',500,.025,.3);else if(a==='fire')loop('lowpass',700,.12)}
+function thunder(){const t=ac.currentTime;noise(t,3,.25,'lowpass',160,.7,ambG,.08);G.S&&(G.S.flash=1)}
+/* --- efeitos --- */
+const FX={
+ step(v){const t=ac.currentTime;noise(t,.05,.05*(v||1),'lowpass',420+Math.random()*200,1,sfxG);osc('sine',70+Math.random()*15,t,.05,.05*(v||1))},
+ blip(w){const t=ac.currentTime;if(!w||/^(Narrador|Caderno|Quadro|Bilhete|Fita|Rádio|Telefone)/.test(w))osc('sine',1100+Math.random()*80,t,.02,.012);else{let h=0;for(const c of w)h=(h*31+c.charCodeAt(0))%997;osc('triangle',220+h%200+Math.random()*20,t,.04,.025)}},
+ door(){const t=ac.currentTime;osc('sine',65,t,.25,.2);noise(t,.08,.06,'lowpass',300,1)},
+ clue(){const t=ac.currentTime;piano(76,t,1.1,1.2);piano(81,t+.12,1,1.6);piano(88,t+.24,.6,1.8)},
+ wrong(){const t=ac.currentTime;piano(36,t,1.4,2);piano(37,t,1.2,2)},
+ ring(){const t=ac.currentTime;for(let k=0;k<2;k++){const s=t+k*.5;[440,480].forEach(f=>{const o=ac.createOscillator(),g=ac.createGain(),m=ac.createOscillator(),mg=ac.createGain();o.frequency.value=f;m.frequency.value=20;mg.gain.value=.025;m.connect(mg);mg.connect(g.gain);g.gain.setValueAtTime(.025,s);g.gain.setValueAtTime(0,s+.4);o.connect(g);g.connect(sfxG);o.start(s);m.start(s);o.stop(s+.42);m.stop(s+.42)})}},
+ click(){osc('square',1600,ac.currentTime,.012,.02)},
+ unlock(){const t=ac.currentTime;osc('square',1400,t,.02,.04);osc('sine',300,t+.08,.15,.08)},
+ paper(){noise(ac.currentTime,.3,.04,'bandpass',2500,.8,sfxG,.05)},
+ whoosh(){noise(ac.currentTime,.7,.05,'bandpass',500,.6,sfxG,.3)},
+ tvoff(){const t=ac.currentTime;const o=osc('sine',1200,t,.45,.1);o.frequency.exponentialRampToValueAtTime(30,t+.45)},
+ tvon(){const t=ac.currentTime;const o=osc('sine',60,t,.6,.08,sfxG,.05);o.frequency.exponentialRampToValueAtTime(900,t+.5)},
+ heart(){const t=ac.currentTime;osc('sine',55,t,.15,.35,sfxG,.01);osc('sine',48,t+.25,.18,.25,sfxG,.01)},
+ shock(){const t=ac.currentTime;piano(33,t,1.6,3);piano(44,t,1.2,3);piano(51,t+.02,1,3);osc('sine',55,t,.15,.35,sfxG,.01);osc('sine',48,t+.28,.18,.28,sfxG,.01)},
+ danger(){const t=ac.currentTime;for(let i=0;i<3;i++)osc('triangle',1320+i*220,t+i*.05,.12,.05,sfxG,.003,.5)},
+ dodge(){noise(ac.currentTime,.25,.12,'bandpass',900,.8,sfxG,.02)},
+ hit(){const t=ac.currentTime;osc('sine',80,t,.3,.4);noise(t,.15,.25,'lowpass',800,1)},
+ meow(){const t=ac.currentTime,o=ac.createOscillator(),fl=ac.createBiquadFilter(),g=ac.createGain();o.type='sawtooth';o.frequency.setValueAtTime(500,t);o.frequency.linearRampToValueAtTime(820,t+.25);o.frequency.linearRampToValueAtTime(560,t+.7);fl.type='bandpass';fl.frequency.setValueAtTime(900,t);fl.frequency.linearRampToValueAtTime(1800,t+.3);fl.frequency.linearRampToValueAtTime(800,t+.7);fl.Q.value=4;env(g,t,.06,.1,.65);o.connect(fl);fl.connect(g);g.connect(sfxG);o.start(t);o.stop(t+.8)}};
+G.A={init,
+ sfx(n,a){if(!ac||!on)return;try{FX[n]&&FX[n](a)}catch(e){}},
+ music(m){if(m===mode)return;const was=mode;mode=m;if(!ac)return;musicG.gain.cancelScheduledValues(ac.currentTime);musicG.gain.setTargetAtTime(m==='none'?0:.55,ac.currentTime,m==='none'?.3:.05);if(was==='none'||m!==was){barT=ac.currentTime+.15;barI=0}},
+ amb:setAmb,
+ slow(k){if(!ac)return;lpf.frequency.setTargetAtTime(k?650:20000,ac.currentTime,.25)},
+ toggle(){on=!on;try{localStorage.setItem('nutcase.som',on?'1':'0')}catch(e){}if(ac)master.gain.setTargetAtTime(on?.85:0,ac.currentTime,.1);return on},
+ get on(){return on}};
+})();
+
+</script>
+<script>
+/* Nutcase P.I. · arte: cenários detalhados, sprites sombreados, iluminação com dither */
+(()=>{
+const G=window.G=window.G||{};const W=320,H=180,FOOT=150;G.FOOT=FOOT;
+let seed=1;const R=()=>(seed=seed*16807%2147483647)/2147483647;const pick=a=>a[(R()*a.length)|0];const rr=(a,b)=>a+R()*(b-a);
+const mk=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c};
+const rect=(g,x,y,w,h,c)=>{w=Math.round(w);h=Math.round(h);if(w<=0||h<=0)return;g.fillStyle=c;g.fillRect(Math.round(x),Math.round(y),w,h)};G.rect=rect;
+const HX={};const rgb=h=>HX[h]||(HX[h]=[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]);
+const c8=v=>v<0?0:v>255?255:v|0;const hex=(r,g,b)=>'#'+((1<<24)|(c8(r)<<16)|(c8(g)<<8)|c8(b)).toString(16).slice(1);
+const mix=(a,b,t)=>{const A=rgb(a),B=rgb(b);return hex(A[0]+(B[0]-A[0])*t,A[1]+(B[1]-A[1])*t,A[2]+(B[2]-A[2])*t)};
+const sh=(c,f)=>f>=0?mix(c,'#ffffff',f):mix(c,'#000000',-f);G.sh=sh;
+const vary=(c,a)=>sh(c,(R()-.5)*a);
+let NS=1;const hash=(x,y)=>{let h=(Math.imul(x|0,374761393)+Math.imul(y|0,668265263)+Math.imul(NS,1442695041))|0;h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967296};
+const vn=(x,y,s)=>{x/=s;y/=s;const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,a=hash(xi,yi),b=hash(xi+1,yi),c=hash(xi,yi+1),d=hash(xi+1,yi+1),u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v};
+const BY=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];const by=(x,y)=>BY[(x&3)+((y&3)<<2)]/16-.47;
+function pix(g,x,y,w,h,fn){x=Math.max(0,x|0);y=Math.max(0,y|0);w=Math.min(g.canvas.width-x,w|0);h=Math.min(g.canvas.height-y,h|0);if(w<=0||h<=0)return;const id=g.getImageData(x,y,w,h),d=id.data;for(let j=0;j<h;j++)for(let i=0;i<w;i++)fn(d,(j*w+i)*4,x+i,y+j);g.putImageData(id,x,y)}
+function dgrad(g,x,y,w,h,cols,steps,horiz){const C=cols.map(rgb),n=C.length-1,s=steps||4;pix(g,x,y,w,h,(d,k,px,py)=>{const t=horiz?(px-x)/Math.max(1,w-1):(py-y)/Math.max(1,h-1);let q=Math.round(t*n*s+by(px,py))/s;q=q<0?0:q>n?n:q;const i=Math.min(n-1,Math.floor(q)),f=q-i,a=C[i],b=C[i+1];d[k]=a[0]+(b[0]-a[0])*f;d[k+1]=a[1]+(b[1]-a[1])*f;d[k+2]=a[2]+(b[2]-a[2])*f;d[k+3]=255})}
+function tex(g,x,y,w,h,amt,sc,blot){pix(g,x,y,w,h,(d,k,px,py)=>{if(!d[k+3])return;const f=((vn(px,py,sc||6)-.5)*(blot||1.2)+(hash(px,py)-.5)*.7)*amt;d[k]+=f;d[k+1]+=f;d[k+2]+=f})}
+function grime(g,x,y,w,h,amt,up){pix(g,x,y,w,h,(d,k,px,py)=>{let t=(py-y)/h;if(up)t=1-t;const n=vn(px*1.5,py*.4,6);const f=1-amt*Math.max(0,Math.min(1,t*t*1.3+(n-.5)*.7));d[k]*=f;d[k+1]*=f;d[k+2]*=f})}
+function streaks(g,x,y,w,h,n,amt){for(let i=0;i<n;i++){const sx=x+R()*w|0,len=h*rr(.3,1);pix(g,sx,y,rr(1,3),len,(d,k,px,py)=>{const f=1-amt*(1-(py-y)/len);d[k]*=f;d[k+1]*=f;d[k+2]*=f})}}
+function line(g,x0,y0,x1,y1,col){x0=Math.round(x0);y0=Math.round(y0);x1=Math.round(x1);y1=Math.round(y1);const dx=Math.abs(x1-x0),dy=-Math.abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1;let e=dx+dy,n=0;g.fillStyle=col;while(n++<900){g.fillRect(x0,y0,1,1);if(x0===x1&&y0===y1)break;const e2=2*e;if(e2>=dy){e+=dy;x0+=sx}if(e2<=dx){e+=dx;y0+=sy}}}G.line=line;
+function thick(g,x0,y0,x1,y1,w,col){const n=Math.max(1,Math.ceil(Math.max(Math.abs(x1-x0),Math.abs(y1-y0))));for(let i=0;i<=n;i++){const t=i/n;rect(g,x0+(x1-x0)*t-w/2+.5,y0+(y1-y0)*t,w,1,col)}}
+function ell(g,cx,cy,rx,ry,col){for(let y=-ry;y<=ry;y++){const xx=Math.round(rx*Math.sqrt(Math.max(0,1-(y*y)/(ry*ry+.01))));rect(g,cx-xx,cy+y,xx*2+1,1,col)}}
+function disc(g,cx,cy,r,col){ell(g,cx,cy,r,r,col)}
+function blob(g,cx,cy,r,col,hi,shd){const rx=Math.ceil(r*1.25);for(let y=-r;y<=r;y++)for(let x=-rx;x<=rx;x++){const d=x*x/1.55+y*y;if(d<r*r)rect(g,cx+x,cy+y,1,1,(x+y<-r*.6&&d<r*r*.7)?hi:(y>r*.45||x>r*.7)?shd:col)}}
+/* fonte 3x5 */
+const F3={A:'010101111101101',B:'110101110101110',C:'011100100100011',D:'110101101101110',E:'111100110100111',F:'111100110100100',G:'011100101101011',H:'101101111101101',I:'111010010010111',J:'001001001101010',K:'101101110101101',L:'100100100100111',M:'101111111101101',N:'110101101101101',O:'010101101101010',P:'110101110100100',Q:'010101101110011',R:'110101110101101',S:'011100010001110',T:'111010010010010',U:'101101101101111',V:'101101101101010',W:'101101111111101',X:'101101010101101',Y:'101101010010010',Z:'111001010100111','0':'111101101101111','1':'010110010010111','2':'110001010100111','3':'110001010001110','4':'101101111001001','5':'111100110001110','6':'011100111101111','7':'111001010010010','8':'111101111101111','9':'111101111001110','.':'000000000000010','#':'101111101111101','?':'110001010000010'};
+function text(g,x,y,s,col,sc){sc=sc||1;let cx=x;for(const ch of s.toUpperCase()){const m=F3[ch];if(m){for(let i=0;i<15;i++)if(m[i]==='1')rect(g,cx+(i%3)*sc,y+((i/3)|0)*sc,sc,sc,col)}cx+=4*sc}}G.text=text;
+
+/* ---------- kit ---------- */
+function bricks(g,x,y,w,h,base,o){o=o||{};const mort=o.mort||sh(base,-.5);rect(g,x,y,w,h,mort);for(let yy=y;yy<y+h;yy+=4){const row=(yy-y)/4|0,off=(row%2)*4;for(let xx=x-off;xx<x+w;xx+=8){const x0=Math.max(xx,x),x1=Math.min(xx+7,x+w);if(x1<=x0)continue;let c=vary(base,.22);if(R()<.07)c=sh(base,-.25);if(R()<.04)c=mix(base,'#a08070',.4);rect(g,x0,yy,x1-x0,3,c);rect(g,x0,yy,x1-x0,1,sh(c,.12));rect(g,x0,yy+2,x1-x0,1,sh(c,-.12));if(R()<.08)rect(g,x0+rr(0,5),yy+rr(0,2),1,1,mort)}}tex(g,x,y,w,h,14,4,1)}
+function plaster(g,x,y,w,h,base,o){o=o||{};rect(g,x,y,w,h,base);tex(g,x,y,w,h,o.tex||30,7,1.8);for(let i=0;i<(o.cracks||4);i++){let cx=x+R()*w,cy=y+R()*h;for(let k=0;k<rr(10,30);k++){cx+=rr(-1,1.2);cy+=rr(0,1.2);if(cx>x&&cx<x+w&&cy<y+h)rect(g,cx,cy,1,1,sh(base,-.45))}}
+ for(let i=0;i<(o.patches||0);i++){const px=x+rr(4,w-26),py=y+rr(4,h-16),pw=rr(10,24),ph=rr(6,12);bricks(g,px,py,pw,ph,o.brick||'#8a5240');for(let k=0;k<pw;k++)if(R()<.6)rect(g,px+k,py-1,1,1,sh(base,.1)),rect(g,px+k,py+ph,1,1,sh(base,-.3))}}
+function windowW(g,x,y,w,h,o){o=o||{};const fr=o.frame||'#5a4a3a';rect(g,x-2,y-2,w+4,h+4,sh(fr,-.5));rect(g,x-1,y-1,w+2,h+2,fr);
+ if(o.lit){dgrad(g,x,y,w,h,[o.lit,sh(o.lit,-.35)],3);if(o.silh)rect(g,x+w*.3,y+h*.45,w*.25,h*.55,sh(o.lit,-.6)),disc(g,x+w*.42,y+h*.38,Math.max(1,w*.1|0),sh(o.lit,-.6))}
+ else{dgrad(g,x,y,w,h,[o.glass||'#2a3a4c','#0e141c'],3);for(let i=0;i<Math.min(w,h);i+=1)if(i%5<2)rect(g,x+w-1-i*.8,y+i,1,1,'#4a5a6c')}
+ if(o.curtain){const cc=o.curtain;for(let i=0;i<w*.28;i++){rect(g,x+i,y,1,h,i%3?cc:sh(cc,-.3));rect(g,x+w-1-i,y,1,h,i%3?cc:sh(cc,-.3))}}
+ if(o.cross!==false){rect(g,x+w/2-.5,y,1,h,fr);rect(g,x,y+h/2-.5,w,1,fr)}
+ if(o.bars)for(let i=x+2;i<x+w;i+=4)rect(g,i,y,1,h,'#2a2a2e');
+ rect(g,x-3,y+h+1,w+6,2,sh(o.sill||'#9a9488',0));rect(g,x-3,y+h+1,w+6,1,sh(o.sill||'#9a9488',.2));rect(g,x-2,y+h+3,w+4,1,'rgba(0,0,0,.3)');
+ if(o.lintel)rect(g,x-3,y-5,w+6,3,o.lintel),rect(g,x-3,y-5,w+6,1,sh(o.lintel,.2))}
+function door(g,x,y,w,h,col,o){o=o||{};rect(g,x-3,y-3,w+6,h+3,sh(col,-.6));rect(g,x-2,y-2,w+4,h+2,sh(col,-.3));rect(g,x,y,w,h,col);const half=o.double?w/2:w;
+ for(let k=0;k<(o.double?2:1);k++){const dx=x+k*half;const pw=half-6;const ph=[h*.28,h*.3,h*.25];let py=y+4;for(let i=0;i<3;i++){const p=ph[i];if(i===0&&o.glass){rect(g,dx+3,py,pw,p,sh(col,-.5));dgrad(g,dx+4,py+1,pw-2,p-2,[o.glass,sh(o.glass,-.5)],2)}else{rect(g,dx+3,py,pw,p,sh(col,-.18));rect(g,dx+3,py,pw,1,sh(col,-.4));rect(g,dx+3,py,1,p,sh(col,-.35));rect(g,dx+3,py+p-1,pw,1,sh(col,.15));rect(g,dx+2+pw,py,1,p,sh(col,.12))}py+=p+3}
+  if(o.double&&k===0)rect(g,dx+half-1,y,1,h,sh(col,-.5))}
+ tex(g,x,y,w,h,14,3,1);rect(g,x+(o.double?w/2-4:w-5),y+h*.52,2,2,'#c8a860');rect(g,x+(o.double?w/2+2:w-5),y+h*.52,2,2,'#c8a860');if(o.arch)for(let i=0;i<w/2;i++){const yy=Math.round(Math.sqrt(Math.max(0,(w/2)**2-(i-w/2)**2))*.5);rect(g,x+i,y-yy-1,1,yy+1,sh(col,-.6));rect(g,x+w-1-i,y-yy-1,1,yy+1,sh(col,-.6))}}
+function steps(g,x,y,n,w,col){for(let i=0;i<n;i++){const sx=x-i*4,sw=w+i*8,sy=y+i*5;rect(g,sx,sy,sw,5,sh(col,-.15));rect(g,sx,sy,sw,1,sh(col,.18));rect(g,sx,sy+4,sw,1,sh(col,-.4));tex(g,sx,sy,sw,5,20,3,1)}}
+function lamp(g,x){rect(g,x-3,140,7,2,'#2a2e30');rect(g,x-2,132,5,8,'#363b3e');rect(g,x-1,30,3,104,'#3a4044');rect(g,x-1,30,1,104,'#5a6266');rect(g,x+1,30,1,104,'#22262a');
+ for(let i=0;i<14;i++){const a=Math.PI*(1-i/13);rect(g,x+6+Math.cos(a)*6,28-Math.sin(a)*5,2,2,'#3a4044')}rect(g,x+9,26,14,3,'#2a2e30');rect(g,x+10,25,12,1,'#4a5054');rect(g,x+11,29,10,1,'#1a1c1e')}
+function chain(g,x0,x1,y0,y1,base){for(let x=x0;x<x1;x++)for(let y=y0;y<y1;y++){const a=(x+y)%6,b=(x-y+600)%6;if(a===0||b===0)rect(g,x,y,1,1,a===0&&b===0?sh(base,.2):(a===0?base:sh(base,-.25)))}
+ for(let x=x0;x<=x1;x+=100){rect(g,x,y0-4,4,y1-y0+4,'#4a5254');rect(g,x,y0-4,1,y1-y0+4,'#7a8486');rect(g,x+3,y0-4,1,y1-y0+4,'#2a3032')}rect(g,x0,y0-2,x1-x0+4,2,'#5a6466');rect(g,x0,y0-2,x1-x0+4,1,'#8a9496');
+ for(let x=x0;x<x1;x+=5){rect(g,x,y0-7,1,1,'#6a7476');rect(g,x+2,y0-6,1,1,'#6a7476')}line(g,x0,y0-6,x1,y0-6,'#3a4244')}
+function bag(g,cx,cy,r,col){const hi=sh(col,.45),sd=sh(col,-.45);ell(g,cx,cy+1,r+1,Math.round(r*.85)+1,'#0e1014');ell(g,cx,cy,r,Math.round(r*.85),col);for(let i=0;i<r;i++)if(R()<.5)line(g,cx-r*.6+i*.4,cy-r*.5+R()*r*.8,cx-r*.3+i*.5,cy+R()*r*.5,sh(col,-.25));
+ ell(g,cx+r*.3,cy+r*.4,r*.6,r*.35|0,sd);for(let k=0;k<4;k++)rect(g,cx-r*.55+k*2+rr(-1,1),cy-r*.45+rr(0,r*.6),rr(1,3),1,hi);rect(g,cx-2,cy-r*.85-3,4,4,col);rect(g,cx-3,cy-r*.85-4,2,2,sd);rect(g,cx+1,cy-r*.85-4,2,2,sd)}
+function eOut(g,cx,cy,rx,ry,col,th){for(let a=0;a<Math.PI*2;a+=.05){const x=cx+Math.cos(a)*rx,y=cy+Math.sin(a)*ry;rect(g,x,y,th||1,th||1,col)}}
+function bubbleTag(g,x,y,n,fill,out){for(let i=0;i<n;i++){const cx=x+i*rr(10,13),cy=y+rr(-3,3),rx=rr(5,7)|0,ry=rr(6,9)|0;eOut(g,cx,cy,rx+1,ry+1,out,1);eOut(g,cx,cy,rx,ry,fill,2);if(R()<.6)line(g,cx-rx+2,cy,cx+rx-2,cy+rr(-3,3),fill);if(R()<.5){line(g,cx,cy-ry,cx+rr(-3,3),cy+ry,fill)}}}
+function scribTag(g,x,y,w,col){let px=x,py=y;for(let i=0;i<w*2;i++){const nx=px+rr(.3,1.4),ny=y+Math.sin(i*.9+R())*rr(2,6);line(g,px,py,nx,ny,col);if(R()<.15){line(g,nx,ny,nx+rr(-2,2),ny-rr(3,7),col)}px=nx;py=ny}}
+function drips(g,x,y,w,col,n){for(let i=0;i<n;i++){const dx=x+R()*w,l=rr(3,14);rect(g,dx,y,1,l,col);rect(g,dx,y+l,1,1,sh(col,-.3))}}
+function wire(g,x0,y0,x1,y1,sag,col){let px=x0,py=y0;for(let i=1;i<=40;i++){const t=i/40,x=x0+(x1-x0)*t,y=y0+(y1-y0)*t+Math.sin(t*Math.PI)*sag;line(g,px,py,x,y,col);px=x;py=y}}
+function pipe(g,x,y0,y1,col){rect(g,x,y0,3,y1-y0,col);rect(g,x,y0,1,y1-y0,sh(col,.25));rect(g,x+2,y0,1,y1-y0,sh(col,-.35));for(let y=y0+8;y<y1;y+=22)rect(g,x-1,y,5,2,sh(col,-.2))}
+function poster(g,x,y,w,h,col){rect(g,x,y,w,h,col);tex(g,x,y,w,h,25,2,1);for(let yy=y+2;yy<y+h-2;yy+=3)rect(g,x+2,yy,w*rr(.4,.85),1,sh(col,-.45));rect(g,x+w-3,y,3,3,'rgba(0,0,0,.35)');rect(g,x+w-3,y,1,1,sh(col,.3))}
+function tree(g,x,base,s,dk){rect(g,x-2,base-s,5,s,'#3a2c20');rect(g,x-2,base-s,1,s,'#4e3c2c');rect(g,x+2,base-s,1,s,'#22180f');for(let i=0;i<14;i++){const bx=x+rr(-.55,.55)*s,byy=base-s-rr(-.15,.55)*s,r=Math.round(rr(.18,.3)*s);blob(g,bx,byy,r,dk?'#2a3a2c':'#3a5038',dk?'#3a4a38':'#567050',dk?'#1a2620':'#24341f')}}
+function cobble(g,x,y,w,h,base){rect(g,x,y,w,h,sh(base,-.55));for(let yy=y;yy<y+h;yy+=4)for(let xx=x+((yy/4)%2)*3;xx<x+w;xx+=rr(5,8)){const c=vary(base,.25),sw=rr(3,6)|0;rect(g,xx,yy,sw,3,c);rect(g,xx,yy,sw,1,sh(c,.18));rect(g,xx+sw-1,yy+1,1,2,sh(c,-.2))}}
+function planks(g,x,y,w,h,col,vert,size){size=size||6;rect(g,x,y,w,h,col);if(vert){for(let xx=x;xx<x+w;xx+=size){const c=vary(col,.18);rect(g,xx,y,size-1,h,c);rect(g,xx+size-1,y,1,h,sh(col,-.5));rect(g,xx,y,1,h,sh(c,.1))}}else{for(let yy=y;yy<y+h;yy+=size){const c=vary(col,.15);rect(g,x,yy,w,size-1,c);rect(g,x,yy+size-1,w,1,sh(col,-.45));for(let xx=x+rr(0,40);xx<x+w;xx+=rr(30,60))rect(g,xx,yy,1,size-1,sh(col,-.45))}}tex(g,x,y,w,h,18,vert?3:2,1);for(let i=0;i<w*h/120;i++)rect(g,x+R()*w,y+R()*h,rr(2,6),1,sh(col,-.2))}
+function damask(g,x,y,w,h,base,mot){rect(g,x,y,w,h,base);for(let yy=y+3;yy<y+h;yy+=12)for(let xx=x+((yy-y)/12%2)*8;xx<x+w;xx+=16){rect(g,xx,yy,1,5,mot);rect(g,xx-2,yy+1,5,1,mot);rect(g,xx-1,yy+3,3,1,mot);rect(g,xx-3,yy+2,1,1,mot);rect(g,xx+3,yy+2,1,1,mot)}tex(g,x,y,w,h,12,8,1)}
+function tiles(g,x,y,w,h,col,s){s=s||8;rect(g,x,y,w,h,sh(col,-.35));for(let yy=y;yy<y+h;yy+=s)for(let xx=x;xx<x+w;xx+=s){const c=vary(col,.08);rect(g,xx,yy,s-1,s-1,c);rect(g,xx,yy,s-1,1,sh(c,.15))}}
+function checker(g,x,y,w,h,a,b,s){for(let yy=y;yy<y+h;yy+=s)for(let xx=x;xx<x+w;xx+=s)rect(g,xx,yy,s,s,((xx/s+yy/s)|0)%2?a:b);tex(g,x,y,w,h,14,4,1)}
+function rug(g,x,y,w,h,col,brd){rect(g,x,y,w,h,brd);rect(g,x+3,y+2,w-6,h-4,col);for(let i=x+5;i<x+w-5;i+=4){rect(g,i,y+1,2,1,sh(brd,.3));rect(g,i,y+h-2,2,1,sh(brd,.3))}ell(g,x+w/2,y+h/2,w*.15|0,h*.25|0,brd);ell(g,x+w/2,y+h/2,w*.08|0,h*.13|0,sh(col,.25));tex(g,x,y,w,h,16,2,1)}
+function crate(g,x,y,w,h,col,label){rect(g,x,y,w,h,col);for(let yy=y;yy<y+h;yy+=4)rect(g,x,yy+3,w,1,sh(col,-.4));rect(g,x,y,2,h,sh(col,-.25));rect(g,x+w-2,y,2,h,sh(col,-.25));rect(g,x,y,w,1,sh(col,.2));tex(g,x,y,w,h,16,2,1);if(label)text(g,x+3,y+2,label,sh(col,-.55))}
+function sky(g,w,h,cols,nstar,moon){dgrad(g,0,0,w,h,cols,5);for(let i=0;i<nstar;i++){const x=R()*w,y=R()*h*.7;rect(g,x,y,1,1,R()<.25?'#e8e4d0':'#8a92a8');if(R()<.06){rect(g,x-1,y,3,1,'#b8bcc8');rect(g,x,y-1,1,3,'#b8bcc8')}}
+ if(moon){const[mx,my,mr]=moon;disc(g,mx,my,mr,'#e8e2c4');disc(g,mx-2,my-2,mr-3,'#f4f0da');for(let i=0;i<6;i++)disc(g,mx+rr(-mr*.6,mr*.6),my+rr(-mr*.6,mr*.6),rr(1,2.5)|0,'#cfc8a8')}}
+function clouds(g,w,y0,y1,col){for(let i=0;i<w/30;i++){const cx=R()*w,cy=rr(y0,y1),l=rr(20,60);for(let k=0;k<3;k++)rect(g,cx+rr(-8,8),cy+k*2,l*rr(.5,1),2,k?sh(col,-.1*k):col)}}
+function skyline(g,x0,x1,base,lit,meta,maxTop){let x=x0;while(x<x1){const bw=rr(30,52)|0,top=rr(6,maxTop||58)|0,col=vary(base,.2);rect(g,x,top,bw,150-top,col);rect(g,x,top,bw,2,sh(col,.15));rect(g,x,top+2,bw,1,sh(col,-.4));tex(g,x,top,bw,150-top,10,5,1);
+  if(R()<.3){rect(g,x+bw*.3,top-10,10,8,sh(col,-.2));rect(g,x+bw*.3+1,top-12,8,2,sh(col,-.3));rect(g,x+bw*.3+2,top-2,1,2,sh(col,-.3));rect(g,x+bw*.3+7,top-2,1,2,sh(col,-.3))}
+  if(R()<.35)rect(g,x+bw*.7,top-14,1,14,sh(col,-.3));
+  for(let wy=top+6;wy<138;wy+=9)for(let wx=x+4;wx<x+bw-5;wx+=8){const L=R()<lit;rect(g,wx,wy,4,5,L?(R()<.75?'#e8b060':'#d06040'):'#1c222c');rect(g,wx,wy+5,4,1,sh(col,.12));if(L&&meta)meta.push([wx+2,wy+2,R()<.75?'255,190,110':'255,110,80'])}
+  if(R()<.35){const fx=x+4;for(let y=top+14;y<130;y+=18){rect(g,fx,y,bw*.5,1,'#22262c');for(let i=0;i<bw*.5;i+=2)rect(g,fx+i,y-4,1,4,'#22262c');line(g,fx+2,y,fx+bw*.4,y+18,'#22262c')}}
+  x+=bw+(R()<.3?rr(2,6)|0:0)}}
+function sidewalk(g,x,y,w,base,curb){rect(g,x,y,w,12,base);for(let xx=x;xx<x+w;xx+=26){rect(g,xx,y,1,12,sh(base,-.35));if(R()<.4){let cx=xx+rr(4,20),cy=y+2;for(let k=0;k<8;k++){cx+=rr(-1,1);cy+=1;rect(g,cx,cy,1,1,sh(base,-.4))}}}rect(g,x,y,w,1,sh(base,.12));tex(g,x,y,w,12,22,4,1.4);
+ rect(g,x,y+12,w,3,curb||sh(base,.1));rect(g,x,y+12,w,1,sh(curb||base,.25));rect(g,x,y+15,w,1,sh(base,-.6))}
+function asphalt(g,x,y,w,h,base){dgrad(g,x,y,w,h,[sh(base,-.1),base],2);tex(g,x,y,w,h,26,3,1.3);for(let i=0;i<w/18;i++)rect(g,x+R()*w,y+R()*h,rr(1,3),1,sh(base,.25))}
+function puddle(g,cx,cy,rx,col){ell(g,cx,cy,rx,Math.max(1,rx*.18|0),col);rect(g,cx-rx*.5,cy-1,rx*.6,1,sh(col,.18))}
+function litter(g,x,y,w,h,n){for(let i=0;i<n;i++){const px=x+R()*w,py=y+R()*h;const t=R();if(t<.35)rect(g,px,py,rr(2,4),rr(1,2),pick(['#c8c0a8','#a8a090','#d8d0b8']));else if(t<.6)rect(g,px,py,2,1,pick(['#8a5a2a','#6a4a22','#a0702a']));else if(t<.75)rect(g,px,py,3,1,'#5a6a7a');else rect(g,px,py,rr(3,8),1,'rgba(120,40,30,.6)')}}
+
+/* ---------- cenários ---------- */
+const META={};G.META=META;
+const B={
+street(){const w=520,c=mk(w,H),g=c.getContext('2d');seed=11;NS=11;const M=META.street={lit:[]};
+ sky(g,w,150,['#2a3848','#3a4a5a','#4a5866'],20);skyline(g,250,w,'#5a5e6a',.16,M.lit);
+ wire(g,250,24,520,30,8,'#14171c');wire(g,250,32,520,44,10,'#14171c');wire(g,0,10,252,6,6,'#14171c');
+ bricks(g,0,0,252,60,'#94584a');
+ for(const wx of[16,76,140,198]){windowW(g,wx,6,30,26,{frame:'#3a3430',lintel:'#a8a294',sill:'#a8a294',lit:wx===140?'#d8a058':null,silh:wx===140,curtain:wx===140?'#7a3a30':null});if(wx===140)M.lit.push([155,19,'255,190,110'])}
+ rect(g,0,32,132,2,'#24272c');for(let i=0;i<132;i+=3)rect(g,i,24,1,8,'#24272c');rect(g,0,24,132,1,'#3a3e44');for(let i=0;i<16;i++)rect(g,120+i,34+i*1.4,2,1,'#24272c');
+ rect(g,176,36,16,11,'#8a8e8a');for(let i=178;i<190;i+=2)rect(g,i,38,1,7,'#5a5e5a');rect(g,176,36,16,1,'#aaaeaa');drips(g,180,47,6,'#3a4a4a',2);
+ rect(g,0,56,252,6,'#a8a294');rect(g,0,56,252,1,'#c8c2b4');rect(g,0,61,252,1,'#5a564c');
+ plaster(g,0,62,252,80,'#8c9c84',{patches:5,brick:'#94584a',cracks:8});
+ grime(g,0,62,252,80,.35);streaks(g,0,62,252,60,26,.25);
+ rect(g,84,60,58,8,'#a8a294');rect(g,84,60,58,1,'#c8c2b4');rect(g,84,67,58,1,'#4a463c');for(let i=0;i<6;i++)rect(g,88+i*9,64,6,2,'#968f80');
+ door(g,92,70,40,58,'#6a4a36',{double:true,glass:'#3a4a58'});rect(g,100,74,6,8,'#d8d0c0');rect(g,118,96,4,4,'#c8c0a8');
+ steps(g,86,128,3,52,'#8a8e86');
+ for(let i=0;i<3;i++){rect(g,146+i*4,120+i*5,1,8,'#2a2c30')}line(g,146,118,158,133,'#2a2c30');line(g,146,119,158,134,'#4a4e54');
+ bubbleTag(g,158,82,6,'#b8402e','#4a2a22');scribTag(g,150,100,40,'#16181c');scribTag(g,190,108,20,'#16181c');scribTag(g,20,90,25,'#2a2c3a');scribTag(g,30,104,18,'#7a2a3a');bubbleTag(g,12,120,3,'#2a2c3a','#4a4e5a');
+ drips(g,156,96,70,'#a03a2c',14);drips(g,150,118,60,'#16181c',6);
+ poster(g,62,86,12,16,'#c8b890');poster(g,46,96,10,13,'#a8483a');poster(g,222,118,10,12,'#d8d0b8');
+ rect(g,150,124,14,16,'#7a8078');rect(g,150,124,14,1,'#9aa098');scribTag(g,151,130,6,'#16181c');
+ pipe(g,244,0,140,'#5a6058');
+ lamp(g,255);
+ dgrad(g,272,76,198,66,['#1e2a24','#2a3a2e'],3);for(let i=0;i<34;i++)blob(g,rr(276,466),rr(86,136),rr(4,9)|0,'#30482e','#44603e','#1c2c1c');rect(g,370,100,30,40,'#3a3e40');rect(g,372,102,26,1,'#5a5e60');
+ chain(g,270,470,78,142,'#8a9496');rect(g,388,100,12,14,'#4a8a7a');rect(g,388,100,12,1,'#7abaa8');text(g,389,104,'NO','#1a3a32');
+ for(let i=0;i<5;i++)rect(g,rr(276,460),rr(132,140),rr(2,6),2,pick(['#c8c0a8','#8a5a3a','#5a6a7a']));
+ sidewalk(g,0,142,w,'#8a9088','#a0a69c');
+ asphalt(g,0,158,w,22,'#3e444a');for(const[px,py,rx]of[[262,166,22],[120,172,16],[400,170,26],[40,164,12]])puddle(g,px,py,rx,'#2a3440');
+ litter(g,0,142,w,36,70);for(let i=0;i<14;i++)ell(g,rr(0,w),rr(144,176),rr(2,6)|0,1,'rgba(130,50,40,.45)');
+ bag(g,452,132,10,'#3a4a5e');bag(g,482,130,12,'#34465a');bag(g,500,136,7,'#2c3a4c');rect(g,440,140,4,2,'#c8c0a8');rect(g,466,141,3,1,'#c86a3a');
+ return c},
+room(){const w=320,c=mk(w,H),g=c.getContext('2d');seed=12;NS=12;
+ damask(g,0,0,w,102,'#4c6c5c','#5e8070');grime(g,0,0,w,102,.25,true);rect(g,0,0,w,6,'#6a4a30');rect(g,0,6,w,1,'#8a6a48');rect(g,0,7,w,1,'#3a2618');rect(g,0,30,w,2,'#5a4028');
+ planks(g,0,102,w,46,'#5e3c28',true,10);for(let x=4;x<w;x+=30){rect(g,x,108,24,32,'#4e3020');rect(g,x,108,24,1,'#3a2216');rect(g,x,139,24,1,'#7a5236');rect(g,x+23,108,1,32,'#7a5236')}rect(g,0,101,w,3,'#7a5236');rect(g,0,101,w,1,'#9a7250');
+ planks(g,0,150,w,30,'#6e4a32',false,5);rect(g,0,146,w,4,'#4a2c1c');rect(g,0,146,w,1,'#7a5236');
+ rect(g,22,30,56,74,'#3a2618');windowW(g,28,36,44,62,{frame:'#6a4a30',glass:'#2a3a5a',sill:'#8a6a48'});disc(g,58,50,4,'#e8e2c4');
+ for(let i=0;i<12;i++){const cc=i%3?'#8a2e2e':'#6a2020';rect(g,18+i,26,1,80,cc);rect(g,82-i,26,1,80,cc)}rect(g,14,24,72,3,'#a08040');
+ rect(g,104,38,54,46,'#7a5a24');rect(g,105,39,52,44,'#c8a050');rect(g,107,41,48,40,'#8a6a2a');rect(g,109,43,44,36,'#2e2a24');dgrad(g,109,43,44,36,['#3a3428','#221e18'],2);
+ [[118,'#d8b89a',0],[130,'#d8b89a',0],[140,'#e0c8b0',1],[148,'#e0c8b0',1]].forEach(([fx,sk,kid])=>{const fy=kid?60:52;rect(g,fx-3,fy,6,7,sk);rect(g,fx-4,fy+7,8,kid?12:20,kid?'#5a4a6a':'#2a2a34');rect(g,fx-3,fy-1,6,2,'#3a2a1a');if(!kid){rect(g,fx-2,fy+2,4,2,'#d8d0c0');rect(g,fx-2,fy+3,4,1,'#9a9080')}else{rect(g,fx-2,fy+3,1,1,'#1a1010');rect(g,fx+1,fy+3,1,1,'#1a1010')}});
+ rect(g,148,118,82,28,'#7a3a34');rect(g,150,106,78,16,'#8a443c');for(let i=154;i<226;i+=6)for(let j=109;j<120;j+=5)rect(g,i+(j%2)*3,j,1,1,'#5a2a24');rect(g,144,112,8,34,'#6a302a');rect(g,226,112,8,34,'#6a302a');ell(g,148,112,4,3,'#7a3a34');ell(g,230,112,4,3,'#7a3a34');rect(g,152,124,36,6,'#94504a');rect(g,190,124,36,6,'#94504a');rect(g,150,146,3,4,'#2a1810');rect(g,226,146,3,4,'#2a1810');tex(g,144,104,92,44,14,2,1);
+ rect(g,234,96,34,24,'#6e3a56');rect(g,232,108,6,38,'#5a2e46');rect(g,264,108,6,38,'#5a2e46');rect(g,236,118,30,28,'#7a4462');rect(g,238,120,26,6,'#8a5070');tex(g,232,96,38,50,14,2,1);
+ rect(g,272,106,28,42,'#5a3a26');rect(g,272,106,28,2,'#7a5236');for(let y=110;y<146;y+=12){rect(g,274,y,24,10,'#4e3220');rect(g,274,y,24,1,'#3a2416');rect(g,284,y+4,4,2,'#c8a050')}
+ rect(g,282,100,8,6,'#8a6a40');rect(g,284,94,4,6,'#a08050');
+ rect(g,56,144,14,4,'#9a9aa8');rect(g,56,144,14,1,'#c8c8d4');rect(g,58,143,10,2,'#7a5a3a');
+ rect(g,300,72,20,76,'#3a2618');door(g,302,76,18,72,'#6a4a32',{});
+ rug(g,110,156,170,18,'#7a2a2a','#4a1a1a');
+ rect(g,189,0,1,12,'#2a1a10');rect(g,180,12,20,3,'#a08040');for(const dx of[-9,-3,3,9])rect(g,190+dx,9,1,4,'#e8e0c8');
+ return c},
+office(){const w=320,c=mk(w,H),g=c.getContext('2d');seed=21;NS=21;
+ plaster(g,0,0,w,104,'#8a8068',{cracks:3,tex:20});grime(g,0,0,w,104,.3,true);
+ planks(g,0,104,w,44,'#5e4230',true,12);rect(g,0,103,w,2,'#7a5a40');rect(g,0,103,w,1,'#9a7a58');
+ checker(g,0,150,w,30,'#5a5650','#706a60',10);rect(g,0,146,w,4,'#3a2a1e');
+ rect(g,12,24,72,70,'#4a3e32');dgrad(g,16,28,64,62,['#1c2840','#2c3a54'],3);skyline(g,16,80,'#3a4258',.25,null,40);rect(g,0,0,16,180,'rgba(0,0,0,0)');
+ g.save();g.beginPath();g.rect(16,28,64,62);g.clip();skyline(g,16,82,'#2e3448',.3,null,50);g.restore();
+ rect(g,12,24,4,70,'#4a3e32');rect(g,80,24,4,70,'#4a3e32');rect(g,12,24,72,4,'#4a3e32');rect(g,12,90,72,4,'#4a3e32');
+ for(let y=29;y<90;y+=4){rect(g,16,y,64,2,'#b8b0a0');rect(g,16,y,64,1,'#d8d0c0')}rect(g,47,28,2,62,'#4a3e32');rect(g,8,94,80,3,'#7a6a58');rect(g,8,94,80,1,'#9a8a78');
+ rect(g,20,112,58,26,'#8a8a86');for(let x=22;x<76;x+=4){rect(g,x,112,3,26,'#a0a09a');rect(g,x+2,112,1,26,'#6a6a66')}
+ rect(g,95,52,3,94,'#4a3222');rect(g,95,52,1,94,'#6a4a32');rect(g,88,144,17,2,'#3a2418');rect(g,89,56,15,1,'#4a3222');rect(g,89,56,1,4,'#4a3222');rect(g,103,56,1,4,'#4a3222');
+ rect(g,112,110,106,5,'#7a5236');rect(g,112,110,106,1,'#9a7250');rect(g,116,115,98,31,'#5e3c28');for(const dx of[120,168])rect(g,dx,119,42,10,'#4e3020'),rect(g,dx+18,123,6,2,'#c8a050');rect(g,116,131,98,1,'#3a2416');tex(g,112,110,106,36,14,2,1);
+ rect(g,160,90,24,22,'#3a2a20');rect(g,160,90,24,2,'#5a4232');
+ rect(g,124,104,16,6,'#e0d8c8');rect(g,126,103,14,1,'#c8c0b0');rect(g,148,106,16,4,'#d8d0c0');rect(g,166,105,10,5,'#2a2a2e');rect(g,168,103,6,2,'#4a4a4e');
+ rect(g,133,104,14,6,'#1a1a1e');rect(g,131,102,18,3,'#1a1a1e');rect(g,132,102,4,2,'#2a2a2e');rect(g,144,102,4,2,'#2a2a2e');disc(g,140,107,2,'#3a3a40');
+ rect(g,190,107,14,3,'#8a7040');rect(g,196,96,2,11,'#a08850');rect(g,186,90,22,7,'#2a7a4a');rect(g,186,90,22,1,'#4aa070');rect(g,188,97,18,1,'#e8e0a0');
+ rect(g,222,98,28,48,'#6a747a');rect(g,222,98,28,1,'#8a949a');for(let y=101;y<144;y+=14){rect(g,224,y,24,12,'#5a646a');rect(g,224,y,24,1,'#7a848a');rect(g,232,y+5,8,2,'#a0a8ae');rect(g,232,y+2,8,2,'#d8d0b8')}
+ rect(g,252,34,48,58,'#5a3a22');rect(g,254,36,44,54,'#9a7040');tex(g,254,36,44,54,30,2,1);
+ const pins=[[258,40],[272,44],[286,39],[262,62],[276,66],[288,58]];pins.forEach(([x,y],i)=>{rect(g,x,y,10,13,i===5?'#2a2a2a':'#e0d8c8');rect(g,x+1,y+3,7,1,'#8a8478');rect(g,x+1,y+6,5,1,'#8a8478');if(i===2){rect(g,x+2,y+2,6,6,'#6a6058')}rect(g,x+4,y-1,2,2,'#c03a2e')});
+ for(let i=0;i<pins.length-1;i++)line(g,pins[i][0]+5,pins[i][1],pins[i+1][0]+5,pins[i+1][1],'#b02a22');
+ rect(g,300,66,20,82,'#3a2a1e');door(g,302,70,18,78,'#6a4a32',{glass:'#a8b8b0'});text(g,304,78,'DET','#2a3a34');
+ disc(g,232,16,7,'#3a2a1e');disc(g,232,16,6,'#e0d8c8');rect(g,232,11,1,5,'#1a1a1a');rect(g,232,16,4,1,'#1a1a1a');
+ return c},
+praca(){const w=480,c=mk(w,H),g=c.getContext('2d');seed=31;NS=31;const M=META.praca={lit:[]};
+ sky(g,w,150,['#1e2a3c','#2e3c50','#3e4a5c'],50,[420,24,9]);clouds(g,w,10,50,'#3a4658');
+ skyline(g,0,w,'#383c48',.07,M.lit,70);
+ rect(g,280,20,24,100,'#5a5a62');rect(g,280,20,24,2,'#7a7a82');for(let x=278;x<306;x++)rect(g,x,10+Math.abs(x-292)*.7,1,10-Math.abs(x-292)*.7,'#3a3a42');disc(g,292,36,5,'#c8c0a0');rect(g,292,32,1,4,'#2a2a2a');rect(g,292,36,3,1,'#2a2a2a');rect(g,291,4,2,6,'#8a8a90');rect(g,288,6,8,1,'#8a8a90');
+ tree(g,30,148,46);tree(g,140,148,40,true);tree(g,394,148,48);
+ bricks(g,412,24,68,124,'#86503e');for(const wx of[420,452])windowW(g,wx,36,18,22,{frame:'#3a3028',sill:'#a8a294',lit:wx===452?'#d8a058':null,curtain:wx===452?'#6a3a2a':null});M.lit.push([461,47,'255,190,110']);
+ rect(g,434,72,34,10,'#2a2420');rect(g,435,73,32,8,'#c8b070');text(g,437,75,'PENSAO','#3a2a1a');door(g,440,92,22,56,'#5a3a28',{glass:'#3a4a50'});rect(g,450,84,3,4,'#3a3a3a');
+ rect(g,64,98,60,50,'#2e5a40');rect(g,64,98,60,2,'#4a7a5a');tex(g,64,98,60,50,16,3,1);for(let x=60;x<128;x+=8){rect(g,x,90,4,8,'#a83a2c');rect(g,x+4,90,4,8,'#e0d4b0')}rect(g,60,88,68,2,'#5a2a20');
+ for(let i=0;i<14;i++)rect(g,68+(i%7)*8,104+((i/7)|0)*14,6,11,pick(['#b04a36','#3a6a9a','#d8b860','#6a9a5a','#e0d8c8'])),rect(g,68+(i%7)*8,104+((i/7)|0)*14,6,1,'#f0e8d0');rect(g,70,132,48,14,'#24482f');
+ rect(g,204,128,72,20,'#8a8a80');rect(g,200,125,80,4,'#a8a8a0');rect(g,200,125,80,1,'#c8c8c0');tex(g,200,125,80,23,20,3,1);rect(g,236,102,8,24,'#8a8a80');rect(g,236,102,1,24,'#a8a8a0');rect(g,228,99,24,4,'#a8a8a0');rect(g,226,98,28,1,'#c8c8c0');rect(g,206,128,68,3,'#3a5a6a');
+ rect(g,318,128,40,3,'#6a4a30');rect(g,318,120,40,2,'#6a4a30');rect(g,318,124,40,1,'#5a3a24');rect(g,320,131,2,9,'#2a2a2a');rect(g,354,131,2,9,'#2a2a2a');rect(g,318,120,40,1,'#8a6a48');
+ lamp(g,170);lamp(g,300);poster(g,165,92,11,14,'#d8d0b8');rect(g,168,96,5,3,'#f0ece4');
+ cobble(g,0,148,w,32,'#7a7c7e');for(const[px,py,rx]of[[186,164,20],[316,170,18],[60,168,14],[420,166,16]])puddle(g,px,py,rx,'#2c3644');litter(g,0,148,w,30,40);
+ return c},
+pensao(){const w=320,c=mk(w,H),g=c.getContext('2d');seed=41;NS=41;
+ plaster(g,0,0,w,148,'#b0a274',{tex:34,cracks:10});grime(g,0,0,w,148,.4,true);streaks(g,0,0,w,100,20,.3);
+ for(let i=0;i<8;i++){const px=rr(0,w-20),py=rr(10,90);rect(g,px,py,rr(6,16),rr(10,30),'#c8bc90');rect(g,px,py,1,20,'#8a7e58')}
+ for(let y=14;y<138;y+=6)for(let x=24+rr(0,8)|0;x<300;x+=rr(3,5)|0)if(R()<.7&&!(x>32&&x<84&&y>32&&y<96)&&!(x>186&&y>104))rect(g,x,y,rr(1,3),1,R()<.1?'#9a2a22':'#2a2618');
+ rect(g,0,0,w,6,'#4a4230');
+ rect(g,32,34,52,62,'#3a3428');dgrad(g,36,38,44,54,['#1a1018','#2a1418'],2);rect(g,40,44,30,10,'#3a1414');text(g,42,46,'HOTEL','#6a2020');for(let x=38;x<80;x+=5)rect(g,x,38,2,54,'#2a2a2e'),rect(g,x,38,1,54,'#4a4a4e');rect(g,30,96,56,3,'#7a6a50');
+ planks(g,0,148,w,32,'#6a4a34',false,5);rect(g,0,146,w,3,'#4a3424');
+ rect(g,190,104,4,44,'#2a2a2e');rect(g,266,112,4,36,'#2a2a2e');for(let x=194;x<266;x+=6)rect(g,x,106,1,12,'#2a2a2e');rect(g,190,104,80,2,'#3a3a3e');
+ rect(g,194,124,72,12,'#8a8a78');rect(g,194,120,72,6,'#b0ac98');rect(g,196,116,16,6,'#d8d0c0');rect(g,214,124,52,12,'#5a6a5a');rect(g,214,124,52,1,'#7a8a7a');tex(g,194,116,72,20,16,2,1);rect(g,190,136,80,2,'#2a2a2e');
+ rect(g,104,114,44,4,'#6a4a30');rect(g,104,114,44,1,'#8a6a48');rect(g,107,118,3,30,'#4a3220');rect(g,142,118,3,30,'#4a3220');
+ rect(g,112,96,28,18,'#7a4a2a');rect(g,112,96,28,1,'#9a6a42');rect(g,115,99,12,12,'#3a2a1c');for(let y=100;y<110;y+=2)rect(g,116,y,10,1,'#5a4230');disc(g,133,104,3,'#c8a860');disc(g,133,104,1,'#3a2a1a');rect(g,130,110,6,2,'#d8d0b0');
+ rect(g,150,46,24,20,'#d8d0b0');rect(g,152,48,20,16,'#7a7260');for(let i=0;i<5;i++)rect(g,153+i*4,54,3,8,'#3a3428'),rect(g,153+i*4,52,3,2,'#c8b090');rect(g,160,50,4,4,'#e0d8c0');rect(g,161,45,2,2,'#c03a2e');
+ rect(g,159,0,1,26,'#1a1a1a');rect(g,157,26,5,3,'#5a5a5a');
+ rect(g,266,140,7,8,'#4a2e1c');rect(g,274,140,7,8,'#4a2e1c');rect(g,266,146,15,2,'#8a3a26');rect(g,266,140,7,1,'#6a4a30');
+ rect(g,0,74,22,74,'#3a2618');door(g,2,78,18,70,'#6a4a32',{});
+ return c},
+estrada(){const w=560,c=mk(w,H),g=c.getContext('2d');seed=51;NS=51;
+ sky(g,w,150,['#101a32','#24304c','#3e3e56'],140,[120,32,14]);clouds(g,w,40,70,'#3a4258');
+ for(let x=0;x<w;x++){const h1=76+Math.sin(x/41)*7+Math.sin(x/13)*2,h2=86+Math.sin(x/29+2)*5;rect(g,x,h1,1,100-h1,'#1e2636');rect(g,x,h2,1,100-h2,'#283040')}
+ dgrad(g,0,90,w,52,['#2e3a24','#46542e'],3);
+ for(let x=0;x<w;x+=2){const t=90+rr(-2,8);rect(g,x,t,1,142-t,pick(['#4a5a30','#56683a','#3e4c28']));if(R()<.5)rect(g,x,t-2,1,3,'#b8984e');if(R()<.4)rect(g,x+1,t+rr(4,30),2,1,'#6a7c40');if(R()<.3)rect(g,x-1,t+rr(6,30),2,1,'#3a4a24')}
+ for(let x=0;x<w;x+=3){const t=106+rr(0,8);rect(g,x,t,2,142-t,pick(['#5a6c38','#667a40','#4a5a2e']));if(R()<.4)rect(g,x,t-3,2,3,'#c8a858');rect(g,x+2,t+rr(3,20),2,1,'#7a8c48')}
+ for(let x=10;x<w;x+=40){rect(g,x,112,4,32,'#6a5038');rect(g,x,112,1,32,'#8a6a4a');rect(g,x+3,112,1,32,'#3a2a1c');rect(g,x-1,111,6,2,'#7a5e42')}for(const y of[120,130]){line(g,0,y,w,y,'#7a7a74');for(let x=4;x<w;x+=10)rect(g,x,y-1,1,3,'#9a9a90')}
+ dgrad(g,0,142,w,38,['#a85a3a','#8a4a30'],3);tex(g,0,142,w,38,30,4,1.5);for(const y of[152,168]){for(let x=0;x<w;x++)rect(g,x,y+Math.sin(x/30)*1,1,2,'#6a3420')}
+ for(let i=0;i<60;i++){const px=R()*w,py=rr(144,178);rect(g,px,py,rr(1,3),rr(1,2),pick(['#7a6a5a','#c8a080','#5a3a2a']))}
+ for(let x=186;x<226;x++){rect(g,x,155+Math.sin(x/8),1,1,'#5a2a18');rect(g,x,159+Math.sin(x/8),1,1,'#5a2a18')}
+ return c},
+orfanato(){const w=480,c=mk(w,H),g=c.getContext('2d');seed=61;NS=61;const M=META.orfanato={lit:[]};
+ sky(g,w,150,['#1a2234','#2a3448','#3a4458'],40);tree(g,90,110,40,true);tree(g,420,104,44,true);tree(g,20,120,34,true);
+ plaster(g,116,30,288,118,'#b4a888',{tex:26,cracks:8});grime(g,116,30,288,118,.35);streaks(g,116,30,288,80,30,.25);
+ for(let x=108;x<412;x++){const top=14+Math.abs(x-260)/12;rect(g,x,top,1,18-Math.abs(x-260)/12+6,'#8a3e2c');if(x%4===0)rect(g,x,top,1,18-Math.abs(x-260)/12+6,'#6a2e20')}for(let x=108;x<412;x++)rect(g,x,30,1,2,'#d8ccb0');rect(g,108,32,304,1,'#5a5040');
+ rect(g,258,0,4,16,'#a8a8a0');rect(g,252,4,16,4,'#a8a8a0');rect(g,258,0,1,16,'#c8c8c0');
+ rect(g,212,36,96,12,'#2a2a2a');rect(g,213,37,94,10,'#3a3a3a');text(g,215,39,'ORFANATO SANTA LUZIA','#d8d0b0');
+ for(let row=0;row<2;row++)for(let x=140;x<392;x+=36){if(row&&x>230&&x<290)continue;const y=56+row*42,lit=R()<.35;windowW(g,x,y,16,24,{frame:'#6a5a48',lit:lit?'#d8a860':null,curtain:lit?'#8a6a5a':null,sill:'#c8bca0',cross:true});for(let i=0;i<8;i++){const yy=Math.round(Math.sqrt(64-(i-8)**2)*.6);rect(g,x+i,y-yy-1,1,yy+1,'#6a5a48');rect(g,x+15-i,y-yy-1,1,yy+1,'#6a5a48')}if(lit)M.lit.push([x+8,y+10,'255,200,120'])}
+ door(g,248,98,26,50,'#6a4a32',{double:true,arch:true});rect(g,258,86,6,6,'#3a3a3a');steps(g,244,146,1,34,'#a8a090');
+ plaster(g,0,108,116,40,'#a09a84',{tex:22,cracks:3});rect(g,0,106,116,3,'#c0b8a0');grime(g,0,108,116,40,.3);
+ rect(g,6,84,58,64,'rgba(0,0,0,0)');for(let x=8;x<62;x+=4){rect(g,x,86,2,62,'#2a2e30');rect(g,x,86,1,62,'#4a5054');rect(g,x,83,2,3,'#3a3e40')}rect(g,6,90,58,2,'#2a2e30');rect(g,6,120,58,2,'#2a2e30');rect(g,4,80,4,68,'#3a3e40');rect(g,62,80,4,68,'#3a3e40');
+ crate(g,288,134,30,14,'#8a6a40','BOA VISTA');crate(g,292,122,24,12,'#7a5a36');crate(g,296,110,18,12,'#8a6a40');
+ for(const x of[420,474]){line(g,x,148,x+6,90,'#4a4a4e');line(g,x+1,148,x+7,90,'#6a6a6e')}line(g,478,90,478,148,'#4a4a4e');rect(g,424,88,56,3,'#5a5a5e');rect(g,424,88,56,1,'#7a7a7e');
+ dgrad(g,0,148,w,32,['#6a5a44','#5a4a38'],2);tex(g,0,148,w,32,26,3,1.3);for(let i=0;i<60;i++)rect(g,R()*w,rr(148,178),1,rr(2,4),pick(['#4a5a30','#5a6a38']));litter(g,0,150,w,28,14);
+ return c},
+bosque(){const w=560,c=mk(w,H),g=c.getContext('2d');seed=71;NS=71;
+ dgrad(g,0,0,w,150,['#0e1418','#1a2624','#24302c'],4);
+ for(let i=0;i<60;i++){const x=R()*w,tw=rr(2,5);rect(g,x,0,tw,146,'#1e2a26')}
+ for(let i=0;i<26;i++)blob(g,R()*w,rr(-6,40),rr(14,24)|0,'#1e2e24','#2a3e30','#141e18');
+ for(let i=0;i<30;i++){const x=R()*w,tw=rr(4,9)|0;rect(g,x,0,tw,148,'#4a3a2c');rect(g,x,0,1,148,'#6a5640');rect(g,x+tw-1,0,1,148,'#2a1e14');tex(g,x,0,tw,148,20,3,1);if(R()<.4)rect(g,x-4,rr(40,100),5,1,'#4a3a2c')}
+ dgrad(g,0,140,w,40,['#4a3c26','#3a2e1e'],3);tex(g,0,140,w,40,30,3,1.4);for(let x=0;x<w;x++){const y=150+Math.sin(x/38)*4;rect(g,x,y,1,9,'#7a6444')}for(let i=0;i<300;i++)rect(g,R()*w,rr(140,180),rr(1,3),1,pick(['#8a5a2a','#a0702a','#5a3a1a','#6a7a3a']));
+ for(let i=0;i<10;i++){const x=R()*w;rect(g,x,144,1,3,'#d8d0c0');rect(g,x-1,143,3,1,'#c04030')}
+ rect(g,498,62,26,86,'#5a544c');for(let y=62;y<148;y+=4){const ins=(148-y)/14;rect(g,498+ins,y,26-ins*2,1,sh('#7a7268',(y%8?-.05:.08)))}rect(g,506,112,10,36,'#1a1612');rect(g,508,80,6,8,'#2a2420');tex(g,498,62,26,86,20,3,1);rect(g,494,58,34,6,'#4a3a2c');
+ rect(g,428,110,3,40,'#7a6040');rect(g,428,110,1,40,'#9a7a54');rect(g,418,112,16,5,'#8a6a46');rect(g,430,120,15,5,'#8a6a46');rect(g,414,128,16,5,'#8a6a46');rect(g,418,112,16,1,'#aa8a62');
+ return c},
+cozinha(){const w=320,c=mk(w,H),g=c.getContext('2d');seed=81;NS=81;
+ plaster(g,0,0,w,40,'#9a9a88',{tex:18,cracks:2});tiles(g,0,40,w,108,'#c8ccbc',8);grime(g,0,40,w,108,.45);streaks(g,0,40,w,60,14,.2);
+ checker(g,0,150,w,30,'#3a3a38','#8a8a7e',10);rect(g,0,146,w,4,'#4a4a44');
+ rect(g,55,0,7,104,'#2a2a2e');rect(g,55,0,1,104,'#4a4a4e');rect(g,28,100,66,48,'#2a2a2e');rect(g,28,96,66,5,'#3e3e44');rect(g,28,96,66,1,'#5a5a60');for(const bx of[40,78])ell(g,bx,97,6,1,'#141416');rect(g,34,108,54,26,'#1e1e22');rect(g,36,110,50,2,'#3a3a40');rect(g,58,118,6,3,'#8a8a8a');rect(g,30,140,4,8,'#1a1a1c');rect(g,88,140,4,8,'#1a1a1c');
+ rect(g,34,86,14,10,'#8a8a92');rect(g,34,86,14,1,'#b0b0b8');rect(g,72,88,12,8,'#6a6a72');rect(g,48,88,4,2,'#3a3a3a');
+ rect(g,98,26,44,46,'#5a4a3a');dgrad(g,102,30,36,38,['#1e2a3c','#101820'],2);rect(g,119,30,2,38,'#5a4a3a');rect(g,102,48,36,2,'#5a4a3a');rect(g,96,72,48,3,'#7a6a58');
+ for(const x of[166,180,194]){disc(g,x,58,6,'#a8603a');disc(g,x-1,57,3,'#c87a4a');rect(g,x,44,1,8,'#3a3a3a')}rect(g,160,42,42,2,'#4a4a4a');
+ rect(g,222,48,30,2,'#6a4a30');for(let i=0;i<4;i++)rect(g,224+i*7,40,5,8,pick(['#8a9a6a','#c8a060','#a04a3a','#d8d0b0'])),rect(g,224+i*7,39,5,1,'#6a5a4a');
+ rect(g,114,116,100,5,'#8a6a48');rect(g,114,116,100,1,'#aa8a62');rect(g,118,121,4,27,'#5a4230');rect(g,206,121,4,27,'#5a4230');rect(g,140,102,26,14,'#7a7a84');rect(g,138,100,30,3,'#9a9aa4');rect(g,138,100,30,1,'#c0c0c8');rect(g,186,112,16,4,'#e0d8c0');rect(g,186,112,16,1,'#f0ecd8');rect(g,193,112,1,4,'#8a6a48');
+ crate(g,214,126,36,22,'#8a6a40','BOA VISTA');crate(g,218,108,30,18,'#7a5a36');crate(g,222,94,22,14,'#8a6a40');
+ rect(g,254,72,32,76,'#3a2a1e');door(g,256,76,28,72,'#6a4a32',{});
+ rect(g,288,82,30,66,'#4a3426');rect(g,288,82,30,1,'#6a4a36');rect(g,302,82,2,66,'#2a1e14');tex(g,288,82,30,66,16,2,1);rect(g,299,104,8,6,'#c8a860');rect(g,300,101,6,4,'rgba(0,0,0,0)');rect(g,300,100,1,4,'#a08850');rect(g,305,100,1,4,'#a08850');rect(g,300,100,6,1,'#a08850');
+ rect(g,159,0,1,22,'#1a1a1a');rect(g,155,22,9,4,'#3a3a3a');
+ rect(g,0,74,16,74,'#3a2618');door(g,2,78,12,70,'#6a4a32',{});
+ return c},
+fazenda(){const w=560,c=mk(w,H),g=c.getContext('2d');seed=91;NS=91;
+ sky(g,w,150,['#0a1224','#18243a','#2a3448'],260,[300,24,9]);for(let i=0;i<200;i++){const x=R()*w,y=40+Math.sin(x/90)*20+rr(-14,14);rect(g,x,y,1,1,'rgba(200,210,230,.35)')}
+ for(let x=0;x<w;x++){const h1=96+Math.sin(x/53)*8+Math.sin(x/17)*2;rect(g,x,h1,1,150-h1,'#1a2228')}
+ dgrad(g,0,138,w,42,['#8a5034','#6a3c28'],3);tex(g,0,138,w,42,30,4,1.4);for(let i=0;i<80;i++)rect(g,R()*w,rr(138,178),1,rr(2,4),pick(['#5a6a34','#4a5a2a','#6a7a3a']));
+ for(const y of[112,122,132])rect(g,12,y,52,3,'#8a6a48'),rect(g,12,y,52,1,'#aa8a62');line(g,14,134,62,112,'#7a5a3c');for(const x of[10,62])rect(g,x,100,5,48,'#6a5038'),rect(g,x,100,1,48,'#8a6a4a');
+ rect(g,14,88,48,14,'#7a6040');rect(g,14,88,48,1,'#9a7a58');text(g,17,90,'BOA VISTA','#2a1a10');text(g,26,96,'1931','#2a1a10');
+ for(let y=46;y<146;y+=6){const s=(y-46)/9;line(g,100-s,y,100+s+.6,y+6,'#6a6a6a');line(g,100+s,y,100-s-.6,y+6,'#6a6a6a');rect(g,100-s-1,y,1,6,'#5a5a5a');rect(g,100+s+1,y,1,6,'#5a5a5a')}rect(g,96,40,8,6,'#5a5a5a');rect(g,104,42,14,2,'#5a5a5a');rect(g,116,38,6,8,'#7a7a7a');
+ planks(g,156,70,120,78,'#8a6a4a',true,6);grime(g,156,70,120,78,.3);for(let x=146;x<286;x++){const t=46+Math.abs(x-216)/2.9;rect(g,x,t,1,26-Math.abs(x-216)/2.9,'#4a2e22');if((x+Math.floor(t))%5===0)rect(g,x,t,1,26-Math.abs(x-216)/2.9,'#3a2218')}rect(g,146,70,140,2,'#2a1a12');
+ windowW(g,196,84,20,16,{frame:'#4a3424',lit:'#d8a050',curtain:'#8a3a2a',sill:'#7a5a40'});door(g,228,102,18,46,'#5a3a26',{});rect(g,156,114,120,3,'#6a4a32');rect(g,156,114,120,1,'#8a6a4a');for(const x of[160,200,270])rect(g,x,117,3,31,'#6a4a32');for(let x=160;x<272;x+=4)rect(g,x,124,1,10,'#5a3a26');rect(g,156,134,120,2,'#5a3a26');
+ rect(g,172,124,12,2,'#4a3020');rect(g,172,124,2,10,'#4a3020');rect(g,182,116,2,10,'#4a3020');line(g,170,136,186,136,'#4a3020');
+ rect(g,366,116,44,16,'#7a5a3c');rect(g,366,116,44,1,'#9a7a54');for(let x=368;x<410;x+=6)rect(g,x,117,1,15,'#5a3e28');for(const wx of[374,402]){disc(g,wx,136,8,'#3a2a1c');disc(g,wx,136,6,'#6a4e34');for(let a=0;a<6;a++)line(g,wx,136,wx+Math.cos(a)*6,136+Math.sin(a)*6,'#3a2a1c');disc(g,wx,136,1,'#2a1a10')}line(g,410,126,436,130,'#6a4a30');
+ rect(g,426,124,30,24,'#7a7a72');for(let y=124;y<148;y+=4)for(let x=426+((y/4)%2)*4;x<456;x+=8)rect(g,x,y,7,3,vary('#8a8a80',.2));rect(g,424,122,34,3,'#9a9a90');rect(g,428,96,3,28,'#5a4030');rect(g,451,96,3,28,'#5a4030');for(let x=422;x<460;x++)rect(g,x,92-Math.abs(x-441)/3,1,5,'#4a2e22');rect(g,440,104,2,10,'#6a6a6a');rect(g,437,112,8,6,'#7a5a3c');
+ planks(g,466,48,92,100,'#a03e2e',true,5);for(let x=458;x<562;x++){const t=30+Math.abs(x-512)/2.4;rect(g,x,t,1,20,'#4a1a14')}rect(g,466,48,92,2,'#e0d8c8');
+ rect(g,492,84,42,64,'#7a2e22');line(g,492,84,533,147,'#e0d8c8');line(g,533,84,492,147,'#e0d8c8');rect(g,492,84,42,2,'#e0d8c8');rect(g,492,84,2,64,'#e0d8c8');rect(g,532,84,2,64,'#e0d8c8');rect(g,512,84,2,64,'#e0d8c8');rect(g,505,60,14,14,'#1a0c0a');rect(g,504,59,16,1,'#e0d8c8');grime(g,466,48,92,100,.25);
+ return c},
+celeiro(){const w=320,c=mk(w,H),g=c.getContext('2d');seed=101;NS=101;
+ planks(g,0,0,w,148,'#8a5a3a',true,9);grime(g,0,0,w,148,.35,true);for(let x=0;x<w;x+=36){rect(g,x,0,6,148,'#5a3a24');rect(g,x,0,1,148,'#7a5236')}rect(g,0,20,w,6,'#5a3a24');rect(g,0,20,w,1,'#7a5236');
+ dgrad(g,0,148,w,32,['#b0964e','#8a7440'],2);tex(g,0,148,w,32,30,2,1.3);for(let i=0;i<260;i++){const x=R()*w,y=rr(146,178);line(g,x,y,x+rr(-4,4),y+rr(-1,1),pick(['#d8c070','#a08a40','#7a6a30']))}
+ for(const[bx,byy]of[[6,134],[34,134],[18,120],[6,106]]){rect(g,bx,byy,28,14,'#c0a050');rect(g,bx,byy,28,1,'#d8c070');rect(g,bx,byy+4,28,1,'#8a7030');rect(g,bx,byy+9,28,1,'#8a7030');tex(g,bx,byy,28,14,30,1,1)}
+ rect(g,68,112,86,5,'#7a5236');rect(g,68,112,86,1,'#9a7250');rect(g,72,117,4,31,'#5a3a24');rect(g,146,117,4,31,'#5a3a24');
+ rect(g,76,100,22,12,'#2a2a2e');rect(g,78,96,18,4,'#e0d8c8');for(let x=78;x<96;x+=2)rect(g,x,106,1,2,'#8a8a8a');rect(g,76,100,22,1,'#4a4a4e');
+ rect(g,104,102,10,10,'#a83a2e');rect(g,104,102,10,2,'#c85040');rect(g,116,102,10,10,'#1e1e22');rect(g,116,102,10,2,'#3a3a40');rect(g,106,112,1,6,'#a83a2e');rect(g,120,112,1,4,'#1e1e22');
+ rect(g,130,104,18,8,'#3a3a40');disc(g,135,108,2,'#1a1a1a');disc(g,143,108,2,'#1a1a1a');rect(g,130,104,18,1,'#5a5a60');
+ rect(g,166,110,24,38,'#3a3a3a');for(let x=166;x<191;x+=3)rect(g,x,110,1,38,'#9a9a9a');rect(g,166,110,24,1,'#b0b0b0');rect(g,166,147,24,1,'#9a9a9a');rect(g,172,142,7,2,'#ecece4');rect(g,180,143,4,1,'#ecece4');rect(g,174,138,8,3,'#8a8a92');
+ rect(g,198,138,7,10,'#4a2e1c');rect(g,206,138,7,10,'#4a2e1c');rect(g,198,146,15,2,'#9a4a2e');rect(g,198,138,7,1,'#6a4a30');
+ rect(g,220,38,78,54,'#5a3a24');rect(g,222,40,74,50,'#d8ccaa');tex(g,222,40,74,50,24,3,1);for(let i=0;i<16;i++)line(g,rr(224,294),rr(42,88),rr(224,294),rr(42,88),'#9a8e70');rect(g,240,52,10,6,'#b8ac8a');rect(g,262,60,14,8,'#b8ac8a');
+ line(g,30,30,30,90,'#6a6a6a');for(let i=-3;i<=3;i+=3)line(g,30+i,90,30+i,100,'#8a8a8a');rect(g,27,90,7,1,'#8a8a8a');rect(g,42,40,16,4,'#8a8a8a');rect(g,42,44,16,1,'#6a6a6a');for(let x=42;x<58;x+=2)rect(g,x,45,1,1,'#6a6a6a');
+ rect(g,300,60,20,88,'#4a2e1c');door(g,302,64,18,84,'#7a4a2e',{});
+ rect(g,159,0,1,18,'#1a1a1a');
+ return c},
+casaj(){const w=440,c=mk(w,H),g=c.getContext('2d');seed=111;NS=111;
+ damask(g,0,0,w,100,'#6a5644','#78624e');grime(g,0,0,w,100,.3,true);planks(g,0,100,260,48,'#6a4a32',true,10);rect(g,0,99,260,3,'#8a6a48');
+ planks(g,0,150,w,30,'#5a3e2a',false,5);rect(g,0,146,w,4,'#3a2618');
+ line(g,20,40,30,98,'#8a8a8a');rect(g,17,34,7,8,'#7a5a3a');line(g,44,40,44,100,'#7a5a3a');for(let i=0;i<5;i++)rect(g,40+i*2,98,1,5,'#9a9a9a');line(g,60,46,60,88,'#7a5a3a');for(let i=0;i<6;i++)rect(g,56+i,46+i*.5,1,1,'#aaaaaa');
+ rect(g,58,128,10,14,'#a83a2e');rect(g,58,128,10,2,'#c85040');rect(g,58,142,10,1,'#6a2a20');rect(g,70,131,10,11,'#1e1e22');rect(g,70,131,10,2,'#3a3a40');rect(g,62,142,1,4,'#a83a2e');
+ rect(g,94,134,7,10,'#4a2e1c');rect(g,102,134,7,10,'#4a2e1c');rect(g,94,142,15,2,'#9a4a2e');
+ rect(g,122,114,44,4,'#7a5236');rect(g,126,118,3,26,'#5a3a24');rect(g,159,118,3,26,'#5a3a24');rect(g,132,102,22,12,'#2a2a2e');rect(g,134,98,18,4,'#e0d8c8');
+ rect(g,166,86,32,3,'#7a5236');rect(g,170,78,14,8,'#3a3a40');disc(g,174,82,1,'#1a1a1a');disc(g,180,82,1,'#1a1a1a');
+ rect(g,198,118,24,26,'#3a3a3a');for(let x=198;x<223;x+=3)rect(g,x,118,1,26,'#9a9a9a');rect(g,198,118,24,1,'#b0b0b0');rect(g,216,114,10,2,'#9a9a9a');
+ rect(g,234,58,6,2,'#5a4230');rect(g,236,60,2,4,'#5a4230');
+ rect(g,256,30,8,118,'#4a3020');rect(g,256,26,26,6,'#4a3020');rect(g,256,26,26,1,'#6a4a30');
+ damask(g,260,100,180,46,'#6a5644','#78624e');rect(g,260,144,180,4,'#3a2618');rug(g,280,152,150,18,'#6a2424','#3a1414');
+ rect(g,288,40,36,44,'#5a4230');dgrad(g,291,43,30,38,['#1e2c48','#101828'],2);disc(g,312,54,3,'#e8e2c4');rect(g,305,43,1,38,'#5a4230');rect(g,286,84,40,3,'#7a5a40');
+ rect(g,330,96,32,22,'#7a3a34');rect(g,326,108,7,40,'#6a2e2a');rect(g,360,108,7,40,'#6a2e2a');rect(g,332,120,28,10,'#8a443c');rect(g,330,130,32,16,'#6a302a');tex(g,326,96,41,52,14,2,1);ell(g,330,108,4,3,'#7a3a34');ell(g,363,108,4,3,'#7a3a34');
+ rect(g,376,98,2,48,'#5a4a3a');rect(g,372,144,10,2,'#3a2a1e');rect(g,369,88,16,10,'#d8b070');rect(g,369,88,16,1,'#f0d090');
+ rect(g,390,108,42,28,'#4a3a2c');rect(g,390,108,42,1,'#6a5a48');rect(g,394,112,28,20,'#1a2422');rect(g,425,116,4,4,'#a08a50');rect(g,425,122,4,2,'#3a3a3a');rect(g,394,136,3,10,'#3a2a1e');rect(g,425,136,3,10,'#3a2a1e');line(g,404,108,398,98,'#5a5a5a');line(g,414,108,420,98,'#5a5a5a');
+ return c}};
+const cache={};G.bg=n=>cache[n]||(cache[n]=B[n]());
+
+/* ---------- personagens ---------- */
+const P=G.P={
+ DET:{type:'trench',coat:'#a87e54',pants:'#2c2c34',shoe:'#1a1616',skin:'#dcae88',hair:'#3a2a20',hat:'fedora',hatC:'#4e4036',tie:'#8a2e2a',shirt:'#e0d8c8'},
+ DETNC:{type:'vest',coat:'#4e4e58',shirt:'#d8d4c8',pants:'#2c2c34',shoe:'#1a1616',skin:'#dcae88',hair:'#3a2a20',tie:'#8a2e2a'},
+ FARM:{type:'overalls',shirt:'#9a5038',coat:'#3e5a80',pants:'#3e5a80',shoe:'#4e3626',skin:'#b88a66',hair:'#a8a498',beard:'#b8b4a8',hat:'straw',hatC:'#d0b064'},
+ FARMNH:{type:'overalls',shirt:'#9a5038',coat:'#3e5a80',pants:'#3e5a80',shoe:'#4e3626',skin:'#b88a66',hair:'#a8a498',beard:'#b8b4a8'},
+ HEL:{type:'dress',coat:'#623460',skin:'#eccab2',hair:'#2a1a18',bun:1,shoe:'#1a1010',neck:'#ece4d4'},
+ LIA:{type:'dress',child:1,coat:'#9484c0',skin:'#f0d4bc',hair:'#6e4628',long:1,shoe:'#3a2a2a',neck:'#f0ece0'},
+ DAVI:{type:'jacket',child:1,coat:'#405a80',pants:'#3a3a46',shoe:'#2a2020',skin:'#e4c4a4',hair:'#6e4628',shirt:'#e0dcd0'},
+ SEB:{type:'jacket',coat:'#706a50',pants:'#4e4636',shoe:'#3a2a1a',skin:'#c49474',hair:'#9a9a8a',beard:'#8a8a7a',messy:1,shirt:'#a8a090'},
+ CLARA:{type:'dress',coat:'#24242c',skin:'#f0d4bc',hat:'veil',hatC:'#1e1e26',neck:'#f0f0e8',shoe:'#111'},
+ ROSA:{type:'dress',coat:'#804e4e',apron:'#e8e4d8',skin:'#d4a484',hair:'#a8a8a8',bun:1,shoe:'#2a1a1a'},
+ NINA:{type:'dress',child:1,coat:'#c44e42',skin:'#f0d4bc',hair:'#2a1a12',long:1,shoe:'#2a1a1a',neck:'#f0ece0'},
+ PAIVA:{type:'jacket',coat:'#484852',pants:'#30303a',shoe:'#151515',skin:'#d4a484',hair:'#2a2a2a',hat:'fedora',hatC:'#2c2c34',stache:'#3a2a20',tie:'#2c3c6e',shirt:'#d8d4c8'},
+ VIZ:{type:'jacket',coat:'#625c56',pants:'#36363e',shoe:'#1a1a1a',skin:'#cca484',hair:'#3a2a1a',shirt:'#c8c4b8'}};
+function outline(c){const g=c.getContext('2d'),w=c.width,h=c.height,id=g.getImageData(0,0,w,h),d=id.data,o=new Uint8ClampedArray(d);for(let y=0;y<h;y++)for(let x=0;x<w;x++){const k=(y*w+x)*4;if(d[k+3])continue;const n=(x>0&&d[k-1])||(x<w-1&&d[k+7])||(y>0&&d[k-w*4+3])||(y<h-1&&d[k+w*4+3]);if(n){o[k]=14;o[k+1]=11;o[k+2]=16;o[k+3]=255}}g.putImageData(new ImageData(o,w,h),0,0);return c}
+function paintFig(o,fr){const c=mk(44,72),g=c.getContext('2d'),r=(x,y,w,h,col)=>rect(g,x,y,w,h,col);const cx=20,foot=70,ch=!!o.child;
+ const L=ch?{h0:2,h1:10,sh:11,wa:20,hip:22,hemT:30,hemJ:25,hemD:34,sW:4,wW:4,hW:6,H:38}:{h0:4,h1:12,sh:14,wa:26,hip:30,hemT:45,hemJ:33,hemD:51,sW:6,wW:5,hW:7,H:54};
+ const top=foot-L.H,Y=v=>top+v;const bob=(fr===2||fr===4)?-1:0;
+ const legs=[[0,0,0,0],[3,-3,0,0],[1,-1,0,2],[-3,3,0,0],[-1,1,2,0]][fr];
+ const T=o.type,coat=o.coat,cHi=sh(coat,.18),cSh=sh(coat,-.28),cDk=sh(coat,-.5),skin=o.skin,sSh=sh(skin,-.22),hair=o.hair||'#2a1a10';
+ const pants=T==='overalls'?coat:(o.pants||sh(coat,-.2)),shoe=o.shoe||'#1a1616',lw=ch?2:3;
+ const hip=Y(L.hip)+bob;
+ const leg=(dx,lift,front)=>{const fx=cx+dx,fy=foot-lift;const col=front?pants:sh(pants,-.3);thick(g,cx+(front?.5:-1.5),hip,fx,fy-2,T==='overalls'?lw+1:lw,col);r(fx-1,fy-2,lw+2,2,front?shoe:sh(shoe,-.2));r(fx+lw,fy-1,1,1,shoe);r(fx-1,fy-2,2,1,sh(shoe,.3))};
+ const armC=(T==='vest'||T==='overalls')?(o.shirt||coat):coat;
+ const sw=[0,-2,0,2,0][fr];
+ const arm=(dx,front)=>{const sx=cx+(front?1:-1),sy=Y(L.sh+1)+bob,hx=cx+dx+(front?2:-2),hy=Y(L.wa+(ch?3:5))+bob;const col=front?armC:sh(armC,-.3);thick(g,sx,sy,hx,hy,ch?2:3,col);if(front)thick(g,sx+1,sy+1,hx+1,hy-1,1,sh(armC,.15));r(hx-1,hy+1,2,2,front?skin:sSh)};
+ leg(legs[1],legs[3],false);arm(-sw,false);leg(legs[0],legs[2],true);
+ const hem=T==='trench'?L.hemT:T==='dress'?L.hemD:T==='overalls'?L.wa+1:L.hemJ;const torsoC=T==='vest'||T==='overalls'?(o.shirt||coat):coat;const tHi=sh(torsoC,.16),tSh=sh(torsoC,-.28);
+ for(let yy=L.sh;yy<=hem;yy++){let hw=yy<=L.wa?L.sW+(L.wW-L.sW)*(yy-L.sh)/(L.wa-L.sh):L.wW+(L.hW-L.wW)*(yy-L.wa)/Math.max(1,hem-L.wa);if(T==='jacket'||T==='vest'||T==='overalls')hw=yy<=L.wa?hw:L.wW;hw=Math.round(hw)-(yy===L.sh?1:0);const y=Y(yy)+bob,ext=(T==='trench'||T==='dress')&&yy>hem-6&&(fr===1||fr===3)?1:0;
+  r(cx-hw-ext,y,hw*2+1+ext,1,torsoC);r(cx-hw-ext,y,2,1,tSh);r(cx+hw,y,1,1,tHi);
+  if((T==='trench'||T==='dress')&&yy>L.wa+2&&yy<hem){if(yy%4)r(cx-2,y,1,1,tSh);if((yy+2)%5)r(cx+3,y,1,1,tSh)}}
+ const sy=Y(L.sh)+bob,wy=Y(L.wa)+bob;
+ if(T==='trench'||T==='jacket'){r(cx-L.wW,wy,L.wW*2+1,1,T==='trench'?cDk:coat);if(T==='trench')r(cx+2,wy,2,1,'#c8a868');for(let k=0;k<6;k++){r(cx+1,sy+k,1,1,cDk);r(cx+2+(k>3?1:0),sy+k,1,1,cHi)}if(o.shirt){r(cx+2,sy,2,3,o.shirt);if(o.tie)r(cx+3,sy+1,1,5,o.tie)}r(cx-4,sy-1,4,2,coat);r(cx-L.sW,sy,3,1,cDk);r(cx+3,wy+3,1,1,cDk);r(cx+3,wy+7,1,1,cDk);if(T==='trench'){r(cx-1,wy+3,1,1,cDk);r(cx-1,wy+7,1,1,cDk)}}
+ if(T==='vest'){for(let yy=L.sh+1;yy<=L.wa+2;yy++){const y=Y(yy)+bob;r(cx-L.wW+1,y,L.wW*2-1,1,coat);r(cx-L.wW+1,y,2,1,cSh)}r(cx+1,sy+1,2,6,o.shirt);r(cx+2,sy+1,1,7,o.tie||'#8a2e2a');r(cx+3,wy-2,1,1,cHi);r(cx+3,wy-5,1,1,cHi);for(let yy=L.wa+3;yy<=L.hip;yy++)r(cx-L.wW,Y(yy)+bob,L.wW*2+1,1,pants)}
+ if(T==='overalls'){for(let yy=L.sh+4;yy<=L.wa;yy++)r(cx-2,Y(yy)+bob,6,1,coat);r(cx-1,Y(L.sh+6)+bob,4,2,sh(coat,-.2));r(cx-2,sy+1,1,3,coat);r(cx+3,sy+1,1,3,coat);for(let yy=L.wa;yy<=L.hip+1;yy++)r(cx-L.wW,Y(yy)+bob,L.wW*2+1,1,coat);r(cx-L.wW,Y(L.wa)+bob,2,L.hip-L.wa,cSh)}
+ if(T==='dress'){r(cx-L.wW,wy,L.wW*2+1,1,cDk);if(o.neck)r(cx-1,sy,4,2,o.neck);if(o.apron){for(let yy=L.wa-5;yy<hem-3;yy++)r(cx-1,Y(yy)+bob,L.wW+1+(yy>L.wa?1:0),1,o.apron);r(cx-1,Y(L.wa-5)+bob,1,hem-L.wa+2,sh(o.apron,-.15))}}
+ if(o.messy)for(let i=0;i<4;i++)r(cx-L.wW+i*3,Y(hem)+bob,1,2,cDk);
+ arm(sw,true);
+ const h0=Y(L.h0)+bob,h1=Y(L.h1)+bob;r(cx-1,h1,3,sy-h1+1,sSh);
+ if(o.hat==='veil')r(cx-5,h0-1,7,(L.sh-L.h0)+5,o.hatC);
+ for(let k=0;k<=L.h1-L.h0;k++){let x0=cx-3,x1=cx+3;if(k===0){x0=cx-2;x1=cx+2}if(k===L.h1-L.h0){x0=cx-1;x1=cx+2}if(o.hat==='veil')x0=Math.max(x0,cx);r(x0,h0+k,x1-x0+1,1,skin);if(o.hat!=='veil')r(x0,h0+k,1,1,sSh)}
+ r(cx+2,h0+4,1,1,'#1a1210');r(cx+1,h0+3,2,1,sh(hair,-.1));r(cx+4,h0+4,1,2,skin);r(cx+4,h0+5,1,1,sSh);r(cx+2,h0+6,2,1,sh(skin,-.3));if(o.hat!=='veil')r(cx-1,h0+3,1,2,sSh);r(cx-1,h1-1,3,1,sSh);
+ if(o.beard){r(cx-1,h0+5,5,L.h1-L.h0-4,o.beard);r(cx+2,h0+6,2,1,sh(o.beard,-.3))}if(o.stache)r(cx+2,h0+5,3,1,o.stache);
+ if(o.hat==='fedora'){const hc=o.hatC;r(cx-5,h0+1,12,1,hc);r(cx-6,h0+2,2,1,hc);r(cx+6,h0+1,2,1,sh(hc,-.2));r(cx-3,h0-3,7,4,hc);r(cx-2,h0-4,5,1,hc);r(cx-3,h0,7,1,sh(hc,-.45));r(cx,h0-4,1,1,sh(hc,-.3));r(cx+1,h0-3,2,1,sh(hc,.2));r(cx-3,h0-3,1,3,sh(hc,-.25));r(cx-1,h0+2,5,1,sSh)}
+ else if(o.hat==='straw'){const hc=o.hatC;r(cx-7,h0+1,15,1,hc);r(cx-8,h0+2,1,1,hc);r(cx+8,h0+2,1,1,hc);r(cx-3,h0-3,7,4,hc);r(cx-2,h0-4,5,1,hc);r(cx-3,h0,7,1,'#7a3a2a');for(let i=-7;i<8;i+=2)r(cx+i,h0+1,1,1,sh(hc,-.18));r(cx-3,h0-3,1,3,sh(hc,-.2));r(cx-1,h0+2,5,1,sSh)}
+ else if(o.hat==='veil'){r(cx-1,h0-1,5,1,o.neck);r(cx-1,h0-1,1,L.h1-L.h0+2,o.neck);r(cx-5,h0-1,1,L.sh-L.h0+5,sh(o.hatC,.15))}
+ else{r(cx-3,h0-1,6,2,hair);r(cx-3,h0+1,2,4,hair);r(cx-1,h0-1,2,1,sh(hair,.2));if(o.messy){r(cx-4,h0-2,1,2,hair);r(cx-1,h0-2,1,1,hair);r(cx+2,h0-2,1,1,hair);r(cx-4,h0+2,1,3,hair)}if(o.long){r(cx-4,h0+1,2,L.sh-L.h0+3,hair);r(cx-4,h0+1,1,L.sh-L.h0+3,sh(hair,-.3))}if(o.bun){r(cx-6,h0,3,3,hair);r(cx-6,h0,1,1,sh(hair,.2))}}
+ return outline(c)}
+const FC={};
+function fig(o,fr){const k=JSON.stringify(o)+fr;return FC[k]||(FC[k]=paintFig(o,fr))}
+G.person=(X,x,foot,o,t)=>{x=Math.round(x);const fr=o.walk?1+((t/7|0)%4):0;const vis={};for(const k in o)if(k!=='walk'&&k!=='face'&&k!=='dim')vis[k]=o[k];const s=fig(vis,fr);
+ X.fillStyle='rgba(0,0,0,.45)';X.beginPath();X.ellipse(x,foot,o.child?6:9,2,0,0,Math.PI*2);X.fill();
+ if((o.face||1)<0){X.save();X.translate(x,0);X.scale(-1,1);X.drawImage(s,-20,foot-70);X.restore()}else X.drawImage(s,x-20,foot-70);
+ if(o.walk&&G.A&&o.sound&&(t%14===0))G.A.sfx('step',.8)};
+G.down=(X,x,foot,o)=>{const s=fig(o,0);X.save();X.translate(x+27,foot-3);X.rotate(-Math.PI/2);X.drawImage(s,-20,-70+20);X.restore()};
+function paintSit(o,front){const c=mk(44,60),g=c.getContext('2d'),r=(x,y,w,h,col)=>rect(g,x,y,w,h,col);const cx=22,st=40,skin=o.skin,sSh=sh(skin,-.22),ov=o.coat;
+ r(cx-6,st-2,5,5,ov);r(cx+1,st-2,5,5,ov);r(cx-6,st+3,5,10,sh(ov,-.25));r(cx+1,st+3,5,10,sh(ov,-.25));r(cx-7,st+13,6,3,o.shoe);r(cx+1,st+13,6,3,o.shoe);
+ r(cx-7,st-18,15,17,o.shirt);r(cx-7,st-18,2,17,sh(o.shirt,-.3));r(cx-4,st-12,9,11,ov);r(cx-4,st-12,9,1,sh(ov,.2));r(cx-2,st-9,5,3,sh(ov,-.2));r(cx-4,st-18,1,6,ov);r(cx+4,st-18,1,6,ov);
+ r(cx-10,st-16,3,12,sh(o.shirt,-.15));r(cx+8,st-16,3,12,sh(o.shirt,-.15));r(cx-10,st-4,3,3,skin);r(cx+8,st-4,3,3,skin);
+ r(cx-1,st-20,3,3,sSh);r(cx-4,st-29,9,10,skin);r(cx-4,st-29,1,10,sSh);r(cx+4,st-29,1,10,sSh);r(cx-4,st-30,9,3,o.hair);r(cx-5,st-28,1,5,o.hair);r(cx+5,st-28,1,5,o.hair);
+ if(front){r(cx-2,st-25,1,1,'#1a1210');r(cx+2,st-25,1,1,'#1a1210');r(cx-2,st-26,2,1,sh(o.hair,-.2));r(cx+1,st-26,2,1,sh(o.hair,-.2))}else{r(cx-3,st-25,1,1,'#1a1210');r(cx+1,st-25,1,1,'#1a1210')}
+ r(cx,st-24,1,2,sSh);r(cx-3,st-22,7,4,o.beard);r(cx-1,st-21,3,1,sh(o.beard,-.35));return outline(c)}
+const SC={};G.sit=(X,x,seat,o,front)=>{const k=front?1:0;const s=SC[k]||(SC[k]=paintSit(o,front));X.drawImage(s,Math.round(x)-22,seat-40)};
+function paintCat(){const c=mk(18,12),g=c.getContext('2d'),r=(x,y,w,h,col)=>rect(g,x,y,w,h,col);r(2,5,12,6,'#ece8e0');r(2,9,12,2,'#c0bcb4');r(11,1,6,6,'#f4f0e8');r(11,0,1,2,'#f4f0e8');r(16,0,1,2,'#f4f0e8');r(12,3,1,1,'#6ab04a');r(15,3,1,1,'#6ab04a');r(13,5,2,1,'#d8a0a0');r(0,4,2,1,'#ece8e0');r(0,2,1,3,'#ece8e0');return outline(c)}
+let CAT=null;G.cat=(X,x,y)=>{CAT=CAT||paintCat();X.drawImage(CAT,Math.round(x)-9,y-11)};
+
+/* ---------- iluminação ---------- */
+const LC=mk(W,H),lg=LC.getContext('2d'),PC=mk(W,H),pg=PC.getContext('2d');G.PC=PC;
+function shape(c,l,cx){const x=l.x-cx,y=l.y;
+ if(l.t==='p'){const gr=c.createRadialGradient(x,y,0,x,y,l.r);gr.addColorStop(0,`rgba(${l.c},${l.i})`);gr.addColorStop(.45,`rgba(${l.c},${l.i*.42})`);gr.addColorStop(1,`rgba(${l.c},0)`);c.fillStyle=gr;c.fillRect(x-l.r,y-l.r,l.r*2,l.r*2)}
+ else if(l.t==='cone'){for(let k=0;k<3;k++){const e=k*7,a=l.i/(1+k*.9);const gr=c.createLinearGradient(0,y,0,l.y2);gr.addColorStop(0,`rgba(${l.c},${a})`);gr.addColorStop(1,`rgba(${l.c},${a*.35})`);c.fillStyle=gr;c.beginPath();c.moveTo(x-l.w0-e*.15,y);c.lineTo(x+l.w0+e*.15,y);c.lineTo(x+l.br+e,l.y2);c.lineTo(x+l.bl-e,l.y2);c.closePath();c.fill()}
+  if(l.pool!==false){const px=x+(l.bl+l.br)/2,pr=(l.br-l.bl)/2;c.save();c.translate(px,l.y2);c.scale(1,.16);const gr=c.createRadialGradient(0,0,0,0,0,pr*1.2);gr.addColorStop(0,`rgba(${l.c},${l.i*.75})`);gr.addColorStop(1,`rgba(${l.c},0)`);c.fillStyle=gr;c.fillRect(-pr*1.3,-pr*1.3,pr*2.6,pr*2.6);c.restore()}}
+ else if(l.t==='poly'){const gr=c.createLinearGradient(0,l.ya,0,l.yb);gr.addColorStop(0,`rgba(${l.c},${l.i})`);gr.addColorStop(1,`rgba(${l.c},${l.i2||0})`);c.fillStyle=gr;c.beginPath();l.pts.forEach((p,i)=>i?c.lineTo(p[0]-cx,p[1]):c.moveTo(p[0]-cx,p[1]));c.closePath();c.fill()}
+ else if(l.t==='r'){c.fillStyle=`rgba(${l.c},${l.i})`;c.fillRect(x,y,l.w,l.h)}}
+function quant(c,lv,alpha){const id=c.getImageData(0,0,W,H),d=id.data;for(let y=0;y<H;y++){const row=y*W;for(let x=0;x<W;x++){const k=(row+x)*4,b=BY[(x&3)+((y&3)<<2)]/16-.47;const n=alpha?4:3;for(let j=0;j<n;j++){let v=Math.round(d[k+j]*lv/255+b);d[k+j]=(v<0?0:v>lv?lv:v)*255/lv}}}c.putImageData(id,0,0)}
+G.light=(X,scene,cx,t,fl,S)=>{const f=G.LIGHT[scene];if(!f)return null;const cfg=f(cx,t,fl,S);
+ lg.globalCompositeOperation='source-over';lg.fillStyle=cfg.amb;lg.fillRect(0,0,W,H);lg.globalCompositeOperation='lighter';for(const l of cfg.L||[])shape(lg,l,cx);quant(lg,22,false);
+ X.globalCompositeOperation='multiply';X.drawImage(LC,0,0);
+ pg.globalCompositeOperation='source-over';pg.clearRect(0,0,W,H);pg.globalCompositeOperation='lighter';for(const l of cfg.P||[])shape(pg,l,cx);quant(pg,18,true);
+ X.globalCompositeOperation='lighter';X.drawImage(PC,0,0);X.globalCompositeOperation='source-over';return cfg};
+const warm='255,226,170',lampC='255,236,190',cool='150,180,230',fireC='255,140,60';
+const winL=(M,cx)=>{const L=[],P=[];for(const w of(M&&M.lit)||[]){L.push({t:'p',x:w[0],y:w[1],r:12,c:w[2],i:.55});P.push({t:'p',x:w[0],y:w[1],r:5,c:w[2],i:.3})}return[L,P]};
+const lampLight=(x,f,L,P)=>{L.push({t:'cone',x,y:31,w0:5,bl:-84,br:60,y2:152,c:lampC,i:.95*f});P.push({t:'cone',x,y:31,w0:4,bl:-72,br:50,y2:150,c:lampC,i:.15*f,pool:false},{t:'p',x,y:30,r:16,c:'255,240,210',i:.9*f})};
+const refl=(x,y,f,P,t)=>{for(let k=0;k<5;k++)P.push({t:'r',x:x-6+Math.sin(t/9+k)*2,y:y+k*3,w:12-k*2,h:1,c:lampC,i:.22*f})};
+G.LIGHT={
+ street:(cx,t,fl,S)=>{const[L,P]=winL(META.street,cx);if(!S.fire){const f=S.burnt?.45:fl;lampLight(271,f,L,P);refl(271,162,f,P,t)}
+  if(S.fire){const fz=.85+Math.random()*.25;L.push({t:'p',x:110,y:60,r:230,c:fireC,i:.9*fz},{t:'p',x:112,y:110,r:110,c:'255,190,90',i:.7*fz});P.push({t:'p',x:110,y:40,r:90,c:fireC,i:.35*fz},{t:'p',x:112,y:100,r:40,c:'255,200,120',i:.4*fz})}
+  return{amb:S.burnt?'#30343c':S.fire?'#4a3a40':'#3e4e60',L,P}},
+ room:(cx,t,fl)=>({amb:'#3c3444',L:[{t:'p',x:286,y:92,r:120,c:warm,i:.95*fl},{t:'p',x:190,y:16,r:100,c:warm,i:.45},{t:'poly',pts:[[30,38],[72,38],[110,150],[60,150]],ya:38,yb:150,c:cool,i:.35,i2:.12}],P:[{t:'p',x:286,y:92,r:18,c:'255,230,180',i:.5*fl},{t:'p',x:190,y:12,r:14,c:'255,230,180',i:.4},{t:'p',x:58,y:50,r:12,c:'230,230,210',i:.3}]}),
+ office:(cx,t,fl,S)=>{const L=[{t:'p',x:197,y:100,r:90,c:'235,235,170',i:.95*fl},{t:'cone',x:197,y:97,w0:8,bl:-30,br:30,y2:112,c:'240,240,180',i:.6*fl,pool:false}],P=[{t:'p',x:197,y:94,r:14,c:'200,255,200',i:.3*fl}];for(let k=0;k<7;k++){const y=30+k*8;L.push({t:'poly',pts:[[16,y],[80,y],[150,150+k*2],[86,150+k*2]],ya:y,yb:150,c:cool,i:.12,i2:.05})}if(S.flags.ring&&(t>>4)%2)P.push({t:'p',x:140,y:104,r:10,c:'255,240,180',i:.4});return{amb:'#2e3644',L,P}},
+ praca:(cx,t,fl)=>{const[L,P]=winL(META.praca,cx);for(const[x,f]of[[186,fl],[316,1]]){L.push({t:'cone',x,y:96,w0:34,bl:-80,br:58,y2:152,c:lampC,i:.85*f});P.push({t:'cone',x,y:31,w0:4,bl:-70,br:50,y2:150,c:lampC,i:.14*f,pool:false},{t:'p',x,y:30,r:16,c:'255,240,210',i:.9*f},{t:'p',x,y:34,r:40,c:lampC,i:.12*f})}refl(186,164,fl,P,t);refl(316,170,1,P,t);L.push({t:'p',x:94,y:96,r:50,c:warm,i:.6},{t:'p',x:451,y:86,r:40,c:warm,i:.6});P.push({t:'p',x:451,y:86,r:8,c:warm,i:.5},{t:'p',x:94,y:92,r:10,c:warm,i:.3});return{amb:'#36445a',L,P}},
+ pensao:(cx,t,fl)=>{const nf=(t>>3)%11?1:.2;return{amb:'#2c262c',L:[{t:'p',x:160,y:30,r:150,c:warm,i:.95*fl},{t:'poly',pts:[[36,40],[80,40],[120,150],[40,150]],ya:40,yb:150,c:'255,70,60',i:.35*nf,i2:.08}],P:[{t:'p',x:160,y:28,r:16,c:'255,240,200',i:.85*fl},{t:'p',x:56,y:50,r:20,c:'255,60,50',i:.3*nf}]}},
+ estrada:(cx,t,fl,S)=>{const L=[{t:'p',x:120,y:30,r:300,c:'120,140,190',i:.35}],P=[{t:'p',x:120,y:32,r:34,c:'220,220,200',i:.35}];if(!G.has('lanterna')){L.push({t:'p',x:362,y:144,r:44,c:warm,i:.85});P.push({t:'p',x:362,y:144,r:8,c:warm,i:.5})}return{amb:'#46567a',L,P}},
+ orfanato:(cx,t,fl)=>{const[L,P]=winL(META.orfanato,cx);L.push({t:'cone',x:261,y:92,w0:3,bl:-30,br:30,y2:150,c:warm,i:.8*fl});P.push({t:'p',x:261,y:90,r:9,c:'255,230,180',i:.7*fl});return{amb:'#3a4458',L,P}},
+ bosque:(cx,t)=>{const L=[],P=[];for(const x of[90,240,380,520]){L.push({t:'poly',pts:[[x,0],[x+10,0],[x-24,150],[x-40,150]],ya:0,yb:150,c:cool,i:.25,i2:.08});P.push({t:'poly',pts:[[x,0],[x+8,0],[x-26,150],[x-36,150]],ya:0,yb:150,c:cool,i:.04,i2:0})}for(let i=0;i<8;i++){const fx=(i*73+t*.2)%560,fy=90+Math.sin(t/40+i)*20;if((t+i*9)%60<40){P.push({t:'p',x:fx,y:fy,r:4,c:'220,240,120',i:.8});L.push({t:'p',x:fx,y:fy,r:14,c:'220,240,120',i:.3})}}L.push({t:'p',x:511,y:84,r:20,c:warm,i:.4});return{amb:'#46565c',L,P}},
+ cozinha:(cx,t,fl)=>({amb:'#30343a',L:[{t:'p',x:159,y:26,r:150,c:warm,i:.95*fl},{t:'p',x:60,y:128,r:36,c:fireC,i:.6+Math.sin(t/7)*.1},{t:'poly',pts:[[102,30],[138,30],[160,150],[110,150]],ya:30,yb:150,c:cool,i:.18}],P:[{t:'p',x:159,y:24,r:14,c:'255,240,200',i:.8*fl},{t:'p',x:60,y:132,r:8,c:fireC,i:.4}]}),
+ fazenda:(cx,t,fl,S)=>{const w=(t>>6)%3?1:.6;const L=[{t:'p',x:300,y:24,r:300,c:'110,130,180',i:.28},{t:'p',x:206,y:92,r:60,c:warm,i:.8*w},{t:'p',x:513,y:80,r:40,c:warm,i:.5}],P=[{t:'p',x:206,y:92,r:10,c:warm,i:.4*w},{t:'p',x:300,y:24,r:20,c:'220,220,200',i:.3}];if(S.flags.smoke)L.push({t:'p',x:0,y:80,r:80,c:fireC,i:.4});return{amb:'#2e3a50',L,P}},
+ celeiro:(cx,t,fl)=>{const L=[{t:'p',x:160,y:24,r:150,c:warm,i:.95*fl}],P=[{t:'p',x:160,y:24,r:14,c:'255,220,150',i:.7*fl}];for(const x of[54,126,198,270])L.push({t:'poly',pts:[[x,0],[x+2,0],[x+30,148],[x+26,148]],ya:0,yb:148,c:cool,i:.3,i2:.1});return{amb:'#261e1c',L,P}},
+ casaj:(cx,t,fl)=>{const tv=.7+Math.random()*.3;return{amb:'#3a3034',L:[{t:'p',x:376,y:92,r:100,c:warm,i:.85},{t:'p',x:410,y:122,r:80,c:'140,220,220',i:.5*tv},{t:'p',x:130,y:6,r:90,c:warm,i:.5}],P:[{t:'p',x:376,y:92,r:14,c:'255,230,180',i:.5},{t:'p',x:408,y:122,r:22,c:'160,240,240',i:.35*tv}]}}};
+
+/* ---------- efeitos dinâmicos (antes da luz) ---------- */
+const mark=(X,x,y,t,col)=>{if((t>>4)%3)rect(X,x,y,2,1,col||'#e8e0b0')};
+G.FX={
+ office:(X,cx,t,fl,S)=>{if(!S.coat){rect(X,90-cx,58,14,38,'#a87e54');rect(X,90-cx,58,2,38,'#7a5a3a');rect(X,96-cx,60,1,30,'#6e5038');rect(X,88-cx,54,18,2,'#4e4036');rect(X,92-cx,50,10,4,'#4e4036')}for(let i=0;i<5;i++)rect(X,20+((t*.6+i*13)%56)-cx,30+((t*1.6+i*29)%58),1,3,'rgba(160,190,220,.6)')},
+ street:(X,cx,t,fl,S)=>{if(S.ch===1){if(!G.has('bota')){rect(X,326-cx,147,6,2,'#6a2a20');rect(X,327-cx,145,4,2,'#6a2a20');rect(X,334-cx,149,5,2,'#6a2a20')}if(!G.has('jornal')){rect(X,384-cx,146,11,4,'#c8c2b0');rect(X,385-cx,147,8,1,'#7a7668');rect(X,385-cx,149,6,1,'#7a7668')}if(!G.has('coleira')){rect(X,458-cx,142,5,2,(t>>4)%2?'#d03a30':'#902a24');rect(X,462-cx,142,1,1,'#e8d070')}}},
+ room:(X,cx,t,fl,S)=>{if(S.ch>=3){for(let i=0;i<5;i++)rect(X,240+i*4-cx,112-(i%2),3,3,['#d8c8e0','#e8d8a0','#c8b0d0'][i%3]);rect(X,244-cx,115,14,2,'#4a6a3a')}},
+ praca:(X,cx,t)=>{for(let i=0;i<6;i++)rect(X,231+i*3-cx,102+((t/2+i*5)%24),1,2,'#a8c8e0');for(let i=0;i<9;i++)rect(X,208+((t*.5+i*8)%62)-cx,128,3,1,'#6a9ab0')},
+ estrada:(X,cx,t)=>{if(!G.has('lanterna')){rect(X,357-cx,141,9,5,'#3a3a3a');rect(X,359-cx,142,5,3,'#f0d890');rect(X,366-cx,142,2,2,'#3a3a3a')}const s='EU NUNCA EXISTI';text(X,250-cx,158,s,'#c8805a');if(!G.has('gravador'))mark(X,452-cx,116,t)},
+ orfanato:(X,cx,t,fl,S)=>{const sw=Math.sin(t/25)*6;G.line(X,440-cx,91,440+sw-cx,126,'#7a7a7a');G.line(X,456-cx,91,456+sw-cx,126,'#7a7a7a');rect(X,437+sw-cx,126,22,2,'#7a4a2a');if(S.ch===4&&!G.has('fita'))rect(X,456+sw-cx,108,2,4,'#d03a30');
+  const w='#ecece4';rect(X,94-cx,124,12,5,w);rect(X,104-cx,119,5,5,w);rect(X,104-cx,118,1,1,w);rect(X,108-cx,118,1,1,w);rect(X,92-cx,118,1,6,w);rect(X,95-cx,112,14,1,w);rect(X,98-cx,109,8,3,w);G.line(X,110-cx,126,118-cx,126,w);G.line(X,116-cx,124,118-cx,126,w);G.line(X,116-cx,128,118-cx,126,w)},
+ bosque:(X,cx,t)=>{G.blades(X,511-cx,64,20,t/90,'#5a5048');for(const[id,x]of[['mapa1',120],['mapa2',250],['mapa3',366]])if(!G.has(id)){rect(X,x-cx,145,5,4,'#e0d8c0');rect(X,x+1-cx,146,3,1,'#c04030')}},
+ cozinha:(X,cx,t,fl,S)=>{for(let i=0;i<4;i++)rect(X,148+i*4-cx,98-((t/3+i*7)%16),1,2,'rgba(230,230,230,.5)');if(S.ch===5){rect(X,124-cx,40,10,10,'#b88a66');rect(X,121-cx,38,16,2,'#d0b064');rect(X,124-cx,35,10,3,'#d0b064');rect(X,131-cx,44,1,1,'#111')}},
+ fazenda:(X,cx,t,fl,S)=>{G.blades(X,100-cx,44,24,t/60,'#8a8a8a');if(!S.flags.scare){const x=330-cx;rect(X,x,92,3,56,'#6a5038');rect(X,x-14,102,31,3,'#6a5038');rect(X,x-6,102,15,22,'#8a4a34');rect(X,x-6,102,2,22,'#6a3424');rect(X,x-4,92,11,10,'#c8b080');rect(X,x-8,91,19,2,'#d0b064');rect(X,x-4,86,11,5,'#d0b064');rect(X,x-2,95,2,2,'#111');rect(X,x+3,95,2,2,'#111');rect(X,x-1,99,5,1,'#5a3a2a');for(let i=0;i<4;i++)rect(X,x-14+i*2,104,1,4,'#d0b064'),rect(X,x+12+i*2,104,1,4,'#d0b064')}else{rect(X,330-cx,100,3,48,'#6a5038');rect(X,316-cx,106,31,3,'#6a5038')}},
+ celeiro:(X,cx,t)=>{rect(X,156-cx,18,8,10,'#3a3a3a');rect(X,157-cx,20,6,6,'#ffd27a');for(const[x,y]of[[236,52],[252,66],[270,48],[284,72]])rect(X,x-cx,y,2,2,'#c03a2e');rect(X,297-cx,44,3,3,(t>>4)%2?'#ff5040':'#c03a2e')},
+ casaj:(X,cx,t,fl,S)=>{for(let i=0;i<60;i++)rect(X,394+Math.random()*28-cx,112+Math.random()*20,1,1,Math.random()<.5?'#d8f0e8':'#6a8a80');if(S.flags.hatOff){rect(X,228-cx,63,15,1,'#d0b064');rect(X,232-cx,59,7,4,'#d0b064');rect(X,232-cx,62,7,1,'#7a3a2a')}if(S.sit){G.sit(X,346-cx,128,P.FARMNH,S.front);if(S.catLap)G.cat(X,347-cx,124)}}};
+const embers=Array.from({length:50},()=>({x:Math.random()*260,y:Math.random()*140,v:.3+Math.random()*.9}));
+G.POST={street:(X,cx,t,S)=>{if(!S.fire)return;for(const[x,y,w,h]of[[16,6,30,26],[76,6,30,26],[140,6,30,26],[198,6,30,26],[92,70,40,58]]){for(let i=0;i<16;i++){const fx=x+Math.random()*w,fh=4+Math.random()*h*.9;rect(X,fx-cx,y+h-fh,2,fh,['#ff9a3a','#ffe08a','#d8501a','#ff7a2a'][(Math.random()*4)|0])}}
+ for(let i=0;i<26;i++)rect(X,Math.random()*252-cx,-2+Math.random()*8,3,5+Math.random()*10,Math.random()<.5?'#ff9a3a':'#ffe08a');
+ for(const e of embers){e.y-=e.v;e.x+=Math.sin((t+e.y)/20)*.4;if(e.y<0){e.y=140;e.x=Math.random()*260}rect(X,e.x-cx,e.y,1,1,'#ffc060')}
+ X.fillStyle='rgba(30,24,24,.4)';for(let i=0;i<7;i++){const sx=(i*44+t*.3)%300;X.fillRect(sx-cx,0,46,14+Math.sin(t/30+i)*5)}},
+ bosque:(X,cx,t)=>{for(let i=0;i<4;i++){X.fillStyle='rgba(170,190,190,.06)';X.fillRect(((t*.15*(i+1))%640)-200-cx*.5,96+i*12,340,10)}},
+ estrada:(X,cx,t)=>{X.fillStyle='rgba(160,170,200,.04)';X.fillRect(0,120,320,30)}};
+G.rain=(X,drops,cfg,cx,ts)=>{ts=ts||1;const cones=(cfg&&cfg.L||[]).filter(l=>l.t==='cone');for(const r of drops){r.y+=r.v*ts;r.x-=.5*ts;if(r.y>H){r.y=-4;r.x=Math.random()*W+20}let lit=false;for(const c of cones){const lx=c.x-cx;if(r.y>c.y&&r.y<c.y2){const f=(r.y-c.y)/(c.y2-c.y);if(r.x>lx+c.bl*f-4&&r.x<lx+c.br*f+4){lit=true;break}}}X.fillStyle=lit?'rgba(255,240,200,.75)':'rgba(140,160,180,.35)';X.fillRect(r.x|0,r.y|0,1,lit?4:3);if(r.y>150&&Math.random()<.04){X.fillRect((r.x|0)-1,152+Math.random()*20,3,1)}}};
+G.qobj=(X,k,x,y,a,from)=>{x=Math.round(x);y=Math.round(y);X.save();X.translate(x,y);
+ if(k==='bottle'){X.rotate(a);rect(X,-2,-5,4,9,'#3a7a4a');rect(X,-1,-8,2,3,'#3a7a4a');rect(X,-1,-4,1,6,'#8ac89a')}
+ else if(k==='beam'||k==='fire'){X.rotate(Math.sin(a*.3)*.4+.3);rect(X,-16,-3,32,6,'#6a4228');rect(X,-16,-3,32,1,'#8a5a38');rect(X,-16,2,32,1,'#3a2214');if(k==='fire')for(let i=0;i<10;i++)rect(X,-16+Math.random()*32,-3-Math.random()*8,2,4+Math.random()*5,Math.random()<.5?'#ff9a3a':'#ffe08a')}
+ else if(k==='fork'){X.rotate(.5+Math.sin(a*.2)*.2);rect(X,-1,-16,2,26,'#7a5a3a');rect(X,-4,10,8,2,'#9a9a9a');for(const d of[-4,-1,2])rect(X,d,12,2,6,'#b0b0b0')}
+ else if(k==='branch'){X.rotate(a*.15);rect(X,-14,-1,28,3,'#4a3420');rect(X,-6,-6,2,6,'#4a3420');rect(X,6,1,2,6,'#4a3420');for(let i=0;i<6;i++)rect(X,-14+i*5,-4,4,3,'#3a5030')}
+ else if(k==='dog'){const leg=(Math.floor(a)%2);if(from==='right')X.scale(-1,1);rect(X,-10,-12,18,8,'#2a2420');rect(X,6,-16,8,7,'#2a2420');rect(X,12,-13,4,3,'#2a2420');rect(X,8,-17,2,2,'#2a2420');rect(X,11,-15,1,1,'#ff4030');rect(X,-13,-12,4,2,'#2a2420');rect(X,-9,-4,2,4+leg,'#2a2420');rect(X,-4,-4,2,4-leg,'#2a2420');rect(X,2,-4,2,4+leg,'#2a2420');rect(X,6,-4,2,4-leg,'#2a2420');rect(X,13,-10,3,1,'#e8e0d0')}
+ X.restore()};
+G.blades=(X,x,y,r,a,col)=>{for(let k=0;k<4;k++){const an=a+k*Math.PI/2;thick(X,x,y,x+Math.cos(an)*r,y+Math.sin(an)*r,2,col);rect(X,x+Math.cos(an)*r*.6,y+Math.sin(an)*r*.6,3,3,col)}rect(X,x-1,y-1,3,3,'#3a3a3a')};
+G.vig=(()=>{const c=mk(W,H),g=c.getContext('2d'),gr=g.createRadialGradient(160,90,50,160,90,190);gr.addColorStop(0,'rgba(0,0,0,0)');gr.addColorStop(1,'rgba(0,0,0,.55)');g.fillStyle=gr;g.fillRect(0,0,W,H);return c})();
+})();
+
+</script>
+<script>
+/* Nutcase P.I. · motor: estado, diálogo, cutscenes, painéis, puzzles, IA, save, loop */
+(()=>{
+const G=window.G,W=320,H=180;
+const C=document.createElement('canvas');C.width=W;C.height=H;const X=C.getContext('2d');X.imageSmoothingEnabled=false;
+const D_=document.getElementById('c'),DX=D_.getContext('2d'),DW=D_.width,DH=D_.height;
+const $=id=>document.getElementById(id);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));G.clamp=clamp;
+const S=G.S={ch:0,day:1,scene:'office',p:{x:150,face:1,walk:0},cam:0,clues:[],solved:{},trust:{},facts:{},coat:false,flags:{},wrong:0,talks:0,quotes:[],play:0,
+ actor:'DETNC',hideP:false,auto:null,autoCb:null,autoSpd:.55,cine:false,trans:false,fire:false,burnt:false,sit:false,catLap:false,front:false,ending:null,detLog:[],npcLog:{},idleT:0,idleI:0,sess:Date.now()};
+G.has=id=>S.clues.includes(id);
+const fill=t=>String(t).replace(/\{nome\}/g,S.facts.nome||'você');G.fill=fill;
+
+/* ---------- save ---------- */
+const KEY='inexistentes.save.v1';
+G.save=()=>{try{localStorage.setItem(KEY,JSON.stringify({ch:S.ch,day:S.day,clues:S.clues,solved:S.solved,trust:S.trust,facts:S.facts,flags:S.flags,wrong:S.wrong,talks:S.talks,quotes:S.quotes.slice(-20),play:S.play,detLog:S.detLog.slice(-20),npcLog:S.npcLog}))}catch(e){}};
+G.load=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}};
+G.wipe=()=>{try{localStorage.removeItem(KEY)}catch(e){}};
+
+/* ---------- diálogo ---------- */
+const D={q:[],cb:null,tw:null,full:'',active:false};
+let hideT=null;const showDlg=()=>{clearTimeout(hideT);$('dlg').classList.remove('hidden')},hideDlg=ms=>{clearTimeout(hideT);hideT=setTimeout(()=>{if(!D.active)$('dlg').classList.add('hidden')},ms||300)};G.hideDlg=hideDlg;
+G.say=(lines,cb)=>{D.q=lines.slice();D.cb=cb||null;D.active=true;showDlg();next()};
+function next(){clearInterval(D.tw);D.tw=null;if(!D.q.length){D.active=false;$('more').textContent='';hideDlg(350);const c=D.cb;D.cb=null;c&&c();return}
+ const[w,t]=D.q.shift();$('who').textContent=w;D.full=fill(t);let i=0;$('txt').textContent='';$('more').textContent='▼ toque';
+ if(!D.full){$('more').textContent='';return}
+ let bk=0;D.tw=setInterval(()=>{i+=2;if(G.A&&(bk++%2===0))G.A.sfx('blip',w);$('txt').textContent=D.full.slice(0,i);if(i>=D.full.length){clearInterval(D.tw);D.tw=null}},22)}
+$('dlg').onclick=()=>{if(D.tw){clearInterval(D.tw);D.tw=null;$('txt').textContent=D.full}else if(D.active)next()};
+$('dlg').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('dlg').click()}};
+G.aside=(w,t)=>{if(D.active)return;if(!t){hideDlg(0);return}showDlg();$('who').textContent=w;$('txt').textContent=fill(t);$('more').textContent='';hideDlg(7000)};
+const panelOpen=()=>!!document.querySelector('.pan.show')||$('ov').classList.contains('show');
+const busy=G.busy=()=>S.cine||S.trans||D.active||panelOpen()||S.auto!=null||!!S.talk;
+
+/* ---------- cutscenes ---------- */
+G.run=(steps,cb)=>{const q=steps.slice();S.cine=true;
+ const nx=()=>{if(!q.length){S.cine=false;cb&&cb();return}const s=q.shift();
+  if(typeof s==='function'){s();return nx()}
+  if(Array.isArray(s))return G.say([s],nx);
+  if(s.say)return G.say(s.say,nx);
+  if(s.go)return G.go(s.go,s.x,nx,s);
+  if(s.walk!=null){S.auto=s.walk;S.autoSpd=s.spd||.55;S.autoCb=nx;return}
+  if(s.wait)return setTimeout(nx,s.wait);
+  if(s.card!=null)return card(s.card,s.ms,nx);
+  if(s.paper)return paper(s.paper,s.sub,nx);
+  if(s.slow){G.slowmo(s.slow,s.word);return nx()}
+  if(s.qte)return G.qte(s.qte,()=>nx());
+  if(s.choice)return choice(s.choice,s.opts,i=>{S.cine=false;s.then(i)});
+  nx()};nx()};
+G.go=(sc,x,cb,o)=>{S.trans=true;G.A&&G.A.sfx('door');$('fade').style.opacity=1;setTimeout(()=>{S.scene=sc;S.p.x=x;if(o&&o.face)S.p.face=o.face;S.cam=clamp(x-160,0,G.SC[sc].w-W);hud();$('fade').style.opacity=0;
+ setTimeout(()=>{S.trans=false;const sc0=G.SC[sc];const k='seen_'+sc+'_'+S.ch;if(!S.cine&&sc0.enter&&!S.flags[k]){S.flags[k]=1;sc0.enter()}cb&&cb()},300)},450)};
+function hud(){$('hudL').textContent=`DIA ${S.day}/30`;$('hudR').textContent=G.SC[S.scene]?G.SC[S.scene].name:''}G.hud=hud;
+function card(text,ms,cb){G.A&&text&&G.A.sfx('whoosh');const ov=$('ov');ov.innerHTML=`<div class="card">${text?fill(text).replace(/\n/g,'<br>'):''}</div>`;ov.classList.add('show');let done=false;
+ const end=()=>{if(done)return;done=true;ov.classList.remove('show');ov.onclick=null;cb()};ov.onclick=text?end:null;setTimeout(end,ms||3200)}
+function paper(h,sub,cb){G.A&&G.A.sfx('paper');const ov=$('ov');const d=new Date();ov.innerHTML=`<div class="paperw"><div class="paper"><div class="mast">Gazeta de Vila Serena</div><div class="date">Edição extra · ${d.toLocaleDateString('pt-BR',{day:'numeric',month:'long'})}</div><h3></h3><p></p></div><button class="go">Continuar</button></div>`;
+ ov.querySelector('h3').textContent=h;ov.querySelector('p').textContent=fill(sub);ov.classList.add('show');ov.onclick=null;ov.querySelector('button').onclick=()=>{ov.classList.remove('show');cb()}}
+function choice(title,opts,cb){G.A&&G.A.sfx('heart');const ov=$('ov');ov.innerHTML=`<div class="choicew"><h2></h2>${opts.map((o,i)=>`<button class="${i?'':'go'}" data-i="${i}"></button>`).join('')}</div>`;ov.querySelector('h2').textContent=title;
+ ov.querySelectorAll('button').forEach((b,i)=>{b.textContent=opts[i];b.onclick=e=>{e.stopPropagation();ov.classList.remove('show');cb(i)}});ov.onclick=null;ov.classList.add('show')}
+
+/* ---------- pistas e capítulos ---------- */
+G.found=(id,lines,cb)=>{if(G.has(id))return G.say([['Brandão','Já anotei isso. '+G.CLUE[id][1]]],cb);S.clues.push(id);G.save();G.A&&G.A.sfx('clue');if(G.SHOCK&&G.SHOCK[id])G.slowmo(3600,G.SHOCK[id]);
+ G.say([...(lines||[]),['Caderno','Pista anotada: '+G.CLUE[id][0]]],()=>{cb&&cb();readyCheck()})};
+function readyCheck(){const c=G.CH[S.ch];if(!c.qs||S.flags['ready'+S.ch])return;const need=[...new Set(c.qs.flatMap(q=>q.need))];
+ if(need.every(G.has)){S.flags['ready'+S.ch]=1;setTimeout(()=>{if(!busy())G.say([['Brandão','Acho que já dá pra montar a teoria, {nome}. Abre o botão Teoria quando quiser.']])},400)}}
+G.startCh=i=>{const c=G.CH[i];G.A&&G.A.music(c.music||'noir');S.ch=i;S.day=Math.max(S.day,c.day);S.idleI=0;S.idleT=0;G.save();hud();
+ G.run([{card:`${c.title}\n<span style="font-size:.6em;color:#8a8778">Dia ${S.day} de 30</span>`,ms:3200},...c.intro],()=>{if(c.hint)G.aside('Caderno',c.hint)})};
+G.addDay=n=>{S.day=Math.min(S.ch<7?26:30,S.day+n);hud()};
+
+/* ---------- painéis ---------- */
+function openPan(id){closeAll();$(id).classList.add('show');if(id==='pNote')renderClues();if(id==='pBoard')renderBoard();if(id==='pWallet')renderAbout()}
+G.openPan=openPan;
+function closeAll(){document.querySelectorAll('.pan').forEach(p=>p.classList.remove('show'))}
+G.closeAll=closeAll;
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=closeAll);
+function addLog(w,t,cls){const p=document.createElement('p');p.className=cls||'';if(w){const b=document.createElement('b');b.textContent=w+': ';p.appendChild(b)}p.appendChild(document.createTextNode(fill(t)));$('log').appendChild(p);$('log').scrollTop=1e9;return p}
+const chat={mode:'det',npc:null,pending:false};
+const TL=['Estranho','Conhecido','Legal','Amigo','Confiável'];const lvl=id=>Math.min(4,Math.floor((S.trust[id]||0)/20));G.lvl=lvl;G.TL=TL;
+const TCOL=['#d0473a','#e8892e','#e8c83a','#7ccf5a','#45b4f0'];G.TCOL=TCOL;
+const SPR={helena:'HEL',seb:'SEB',davi:'DAVI',clara:'CLARA',rosa:'ROSA'};
+const DOPTS=[['O que você acha?','O que você acha disso tudo até agora?'],['Onde olho agora?','Onde eu devo olhar agora? Com quem falar?'],['Resumo das pistas','Me dá um resumo das pistas.']];
+let ttw=null;
+function tSay(who,txt){clearInterval(ttw);$('tWho').textContent=who?who+':':'';const full=fill(txt);let i=0;$('tTxt').textContent='';ttw=setInterval(()=>{i+=2;$('tTxt').textContent=full.slice(0,i);if(G.A&&i%4===0)G.A.sfx('blip',who);if(i>=full.length)clearInterval(ttw)},20)}
+function tChoices(){const box=$('tChoices');box.innerHTML='';if(chat.mode==='final')return;const used=S.flags['used_'+(chat.npc||'det')]||(S.flags['used_'+(chat.npc||'det')]=[]);
+ const opts=chat.mode==='det'?DOPTS:(G.NPC[chat.npc].opts||[]);
+ opts.forEach((o,i)=>{if(chat.mode==='npc'&&o[2]!=='keep'&&used.includes(i))return;const b=document.createElement('button');b.textContent=o[0];if(o[2]==='bad')b.className='bad';b.onclick=()=>{if(chat.pending)return;if(o[2]!=='keep')used.push(i);send(o[1])};box.appendChild(b)});
+ const w=document.createElement('button');w.className='go';w.textContent='✎ Escrever';w.onclick=()=>{$('tForm').hidden=false;$('tChoices').hidden=true;setTimeout(()=>$('tIn').focus(),30)};box.appendChild(w);
+ const x=document.createElement('button');x.textContent='Sair';x.onclick=closeTalk;box.appendChild(x)}
+function openTalk(mode,id){chat.mode=mode;chat.npc=id||null;chat.pending=false;let nx=null;
+ if(mode==='npc'){const sc=G.SC[S.scene],key=SPR[id];const n=(sc.npcs?sc.npcs():[]).find(n=>n.o===G.P[key]);nx=n?n.x:S.p.x+24}
+ S.talk={mode,id,x:nx,fx:null};$('game').classList.add('talking');$('tForm').hidden=mode!=='final';$('tChoices').hidden=mode==='final';$('tIn').value='';
+ const go=()=>{if(mode==='npc'){const n=G.NPC[id],L=S.npcLog[id]||[];tSay(n.name,L.length?L[L.length-1][1]:n.intro)}
+  else if(mode==='det'){const L=S.detLog;tSay('Brandão',L.length?L[L.length-1][1]:(S.facts.nome?'{nome}, né? Pode falar. Teorias, palpites, o que vier.':'Pode falar. Teorias, palpites, o que vier. Eu tô ouvindo.'))}
+  else tSay('Brandão','Você existe?');tChoices();if(mode==='final')setTimeout(()=>$('tIn').focus(),60)};
+ if(mode==='npc'){const side=S.p.x<=nx?-1:1,tx=clamp(nx+side*26,10,G.SC[S.scene].w-10);if(Math.abs(S.p.x-tx)>2){S.auto=tx;S.autoSpd=1.2;S.autoCb=()=>{S.p.face=-side;go()}}else{S.p.face=-side;go()}}else go()}
+function closeTalk(){if(chat.mode==='final'){if(!chat.pending)finalReply(null);return}S.talk=null;$('game').classList.remove('talking');clearInterval(ttw);hideDlg(0)}
+G.closeTalk=closeTalk;
+G.openDet=()=>openTalk('det');G.openNpc=id=>openTalk('npc',id);
+$('tForm').onsubmit=e=>{e.preventDefault();const m=$('tIn').value.trim().slice(0,400);if(!m)return;$('tIn').value='';if(chat.mode!=='final'){$('tForm').hidden=true;$('tChoices').hidden=false}send(m)};
+$('tIn').addEventListener('keydown',e=>{if(e.key==='Escape'){$('tForm').hidden=true;$('tChoices').hidden=false}});
+async function send(msg){if(chat.pending)return;chat.pending=true;$('tChoices').classList.add('wait');
+ try{
+ if(chat.mode==='det'){tSay('Você',msg);S.talks++;S.quotes.push(msg);grab(msg);await new Promise(r=>setTimeout(r,500));$('tTxt').textContent='…';$('tWho').textContent='Brandão:';const r=await ask(detPrompt(msg));
+  const fala=r&&typeof r.fala==='string'&&r.fala?r.fala:fbDet(msg);if(r&&r.fatos&&typeof r.fatos==='object')for(const k in r.fatos){const v=r.fatos[k];if(v&&typeof v!=='object')S.facts[String(k).slice(0,20)]=String(v).slice(0,60)}
+  S.detLog.push(['Você',msg],['Brandão',fala]);tSay('Brandão',fala);G.save()}
+ else if(chat.mode==='npc'){const id=chat.npc,n=G.NPC[id];tSay('Brandão',msg);await new Promise(r=>setTimeout(r,500));$('tWho').textContent=n.name+':';$('tTxt').textContent='…';let r=await ask(npcPrompt(id,msg));
+  if(!r||typeof r.fala!=='string'||!r.fala)r=fbNpc(id,msg);const before=lvl(id),d=clamp(+r.delta||0,-15,25);S.trust[id]=clamp((S.trust[id]||0)+d,0,100);if(S.talk)S.talk.fx={d,t:performance.now()};
+  (S.npcLog[id]=S.npcLog[id]||[]).push(['Brandão',msg],[n.name,r.fala]);let fala=r.fala;const l=lvl(id);
+  if(l!==before&&G.A)G.A.sfx(l>before?'click':'wrong');
+  let extra=null;if(n.at2&&l>=2)extra=n.at2();
+  if(!G.has(n.clue)&&l>=3&&(r.revela||n.topics.test(msg.toLowerCase()))){if(!r.revela)fala=n.reveal;S.clues.push(n.clue);G.A&&G.A.sfx('clue');if(G.SHOCK&&G.SHOCK[n.clue])setTimeout(()=>G.slowmo(3600,G.SHOCK[n.clue]),400);setTimeout(()=>G.aside('Caderno','Pista anotada: '+G.CLUE[n.clue][0]),100);readyCheck()}
+  tSay(n.name,fala);if(extra)setTimeout(()=>G.aside('Caderno',extra),fala.length*10+600);G.save()}
+ else if(chat.mode==='final'){tSay('Você',msg);S.quotes.push(msg);const r=await ask(finalPrompt(msg));chat.pending=false;finalReply(r&&r.fala?r.fala:null);return}
+ }finally{chat.pending=false;$('tChoices').classList.remove('wait');if(S.talk)tChoices()}}
+G.drawTalk=(X,cx,t)=>{const k=S.talk;if(!k||k.mode!=='npc'||k.x==null)return;const id=k.id,o=G.P[SPR[id]],tr=S.trust[id]||0,l=lvl(id),col=TCOL[l];const x=Math.round(k.x-cx),top=G.FOOT-(o.child?38:54)-12;
+ const w=28;G.rect(X,x-w/2-1,top-1,w+2,5,'#0c0c10');G.rect(X,x-w/2,top,w,3,'#2a2a30');G.rect(X,x-w/2,top,Math.max(1,Math.round(w*tr/100)),3,col);G.rect(X,x-w/2,top,Math.round(w*tr/100),1,G.sh(col,.35));for(let i=1;i<5;i++)G.rect(X,x-w/2+i*w/5,top,1,3,'#0c0c10');
+ const lab=TL[l].normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();G.text(X,x-Math.round(lab.length*2),top-7,lab,col);
+ if(k.fx&&performance.now()-k.fx.t<1400){const f=(performance.now()-k.fx.t)/1400,c=k.fx.d>=0?'#7ce05a':'#ff5a4a',yy=top-12-f*8;G.text(X,x+w/2+2,Math.round(yy),k.fx.d>=0?'+':'-',c)}};
+function renderClues(){const by={};S.clues.forEach(c=>{const ch=G.CLUE[c][2];(by[ch]=by[ch]||[]).push(c)});
+ $('clues').innerHTML=S.clues.length?Object.keys(by).map(ch=>`<div class="chap">${G.CH[ch].title.replace(/<[^>]+>/g,'')}</div>`+by[ch].map(c=>`<div class="clue"><b>${G.CLUE[c][0]}</b><br>${G.CLUE[c][1]}</div>`).join('')).join(''):'<p class="sub">Nada ainda. Ande pela cena e examine tudo.</p>'}
+function renderAbout(){const f=S.facts,k=Object.keys(f);$('aboutYou').textContent=k.length?k.map(x=>x+': '+f[x]).join(' · '):'Nada. Ainda.'}
+function renderBoard(){const c=G.CH[S.ch];if(!c.qs){$('qs').innerHTML='<p class="sub">Ainda não há teoria pra montar aqui.</p>';return}
+ $('qs').innerHTML=c.qs.map((q,qi)=>{const miss=q.need.filter(n=>!G.has(n)),k=S.ch+'_'+qi;return`<div class="q ${S.solved[k]?'ok':''}"><b style="color:var(--lamp);font-weight:400">${q.q}</b>${S.solved[k]?`<div>✓ ${q.o[q.a]}</div>`:miss.length?`<div class="sub">Faltam pistas para afirmar isso (${miss.length}).</div>`:`<div class="opts">${q.o.map((o,i)=>`<button data-q="${qi}" data-i="${i}">${o}</button>`).join('')}</div>`}</div>`}).join('');
+ $('qs').querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{const qi=+b.dataset.q,q=c.qs[qi];if(+b.dataset.i===q.a){S.solved[S.ch+'_'+qi]=1;G.save();renderBoard();if(c.qs.every((_,j)=>S.solved[S.ch+'_'+j])){setTimeout(()=>{closeAll();G.run(c.outro,()=>G.startCh(S.ch+1))},700)}}
+  else{S.wrong++;G.A&&G.A.sfx('wrong');G.addDay(1);closeAll();G.say([['Brandão',q.miss||'Não… isso não fecha. Segui a pista errada e perdi a noite inteira.'],['Caderno',`Um dia perdido. Agora é o dia ${S.day} de 30.`]])}})}
+
+/* ---------- puzzles ---------- */
+function puz(t,d){openPan('pPuz');$('puzT').textContent=t;$('puzD').textContent=d||'';return $('puzB')}
+G.codeLock=o=>{const b=puz(o.title,o.desc);let code='';b.innerHTML=`<div class="code" id="code">____</div><div class="keys">${['1','2','3','4','5','6','7','8','9','←','0','OK'].map(k=>`<button data-k="${k}">${k}</button>`).join('')}</div>`;
+ b.querySelector('.keys').onclick=e=>{const k=e.target.dataset.k;if(!k)return;G.A&&G.A.sfx('click');if(k==='←')code=code.slice(0,-1);else if(k==='OK'){if(code===o.code){closeAll();G.A&&G.A.sfx('unlock');o.ok()}else{code='';$('code').textContent='ERRO';return}}else if(code.length<4)code+=k;$('code').textContent=(code+'____').slice(0,4)}};
+G.wordPuz=o=>{const b=puz(o.title,o.desc);b.innerHTML=`${o.html}<form class="row" id="wf"><input id="wi" autocomplete="off" placeholder="Resposta"><button class="go">Tentar</button></form><div class="sub" id="wm"></div>`;
+ const norm=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/gi,'').toUpperCase();
+ $('wf').onsubmit=e=>{e.preventDefault();if(norm($('wi').value)===o.answer){closeAll();o.ok()}else $('wm').textContent='Não é isso. Olhe de novo.'}};
+G.orderPuz=o=>{const b=puz(o.title,o.desc);const idx=o.items.map((_,i)=>i).sort(()=>Math.random()-.5);let seq=[];
+ const draw=()=>{b.innerHTML=`<div class="seq">${seq.map(i=>'▸ '+o.items[i]).join('<br>')||'Toque nos trechos na ordem certa.'}</div><div class="opts">${idx.filter(i=>!seq.includes(i)).map(i=>`<button data-i="${i}"></button>`).join('')}</div>`;
+  b.querySelectorAll('[data-i]').forEach(x=>{x.textContent=o.items[+x.dataset.i];x.onclick=()=>{const i=+x.dataset.i;if(i!==seq.length){seq=[];draw();b.querySelector('.seq').textContent='A fita embola. Começa de novo.';return}seq.push(i);if(seq.length===o.items.length){setTimeout(()=>{closeAll();o.ok()},500)}draw()}})};draw()};
+G.pathPuz=o=>{const b=puz(o.title,o.desc);b.innerHTML=`<div class="opts">${o.opts.map((t,i)=>`<button data-i="${i}"></button>`).join('')}</div>`;
+ b.querySelectorAll('[data-i]').forEach(x=>{x.textContent=o.opts[+x.dataset.i];x.onclick=()=>{closeAll();+x.dataset.i===o.correct?o.ok():o.bad()}})};
+
+/* ---------- IA ---------- */
+let AI=null;try{if(window.claude&&claude.use)claude.use('sample').then(a=>{AI=a}).catch(()=>{})}catch(e){}
+async function ask(prompt){if(!AI)return null;try{const r=await AI(prompt,{cache:false,modelTier:'quick'});const m=(r&&r.text||'').match(/\{[\s\S]*\}/);return m?JSON.parse(m[0]):null}catch(e){if(e&&e.code==='not_granted')AI=null;return null}}
+const hora=()=>new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+function detPrompt(msg){const c=G.CH[S.ch];return`Você é o Detetive Otávio Brandão, protagonista do jogo noir em pixel art "Nutcase P.I.", na cidade fictícia de Vila Serena. O jogador é uma voz na sua cabeça que escreve pensamentos e teorias; você responde de igual pra igual: observador, conversador, frases curtas de noir, português do Brasil, no máximo 3 frases. Você fala muito e gosta da companhia dessa voz.
+Momento da história: ${c.brief} Dia ${S.day} de 30. Local: ${G.SC[S.scene].name}.
+Pistas no caderno: ${S.clues.map(id=>G.CLUE[id][0]+(G.CLUE[id][2]===S.ch?' ('+G.CLUE[id][1]+')':'')).join('; ')||'nenhuma'}.
+Regras: se a mensagem não tiver relação com o caso, com a cena ou com conhecer o jogador, responda curto e termine com algo como "Vamos voltar à cena." Nunca revele a solução nem conclua mais do que as pistas sustentam; diga se a teoria do jogador combina com as pistas e sugira onde olhar ou com quem conversar. De vez em quando, de forma casual, pergunte algo sobre o jogador (nome, idade, cidade, família, trabalho, que horas são aí) — você coleciona esses detalhes em silêncio. Hora real do jogador: ${hora()}.
+O que já sabe do jogador: ${JSON.stringify(S.facts)}
+Conversa recente:
+${S.detLog.slice(-8).map(l=>l[0]+': '+l[1]).join('\n')}
+Jogador: ${msg}
+Responda só com JSON: {"fala":"...","fatos":{}} — em "fatos" coloque apenas dados novos que o jogador revelou sobre si mesmo (chaves curtas: nome, idade, cidade, familia, trabalho, hora, outro).`}
+function npcPrompt(id,msg){const n=G.NPC[id];return`Você interpreta ${n.name} no jogo noir "Nutcase P.I." (cidade fictícia de Vila Serena), conversando com o detetive Otávio Brandão. ${n.persona} Fale português do Brasil, no máximo 3 frases, sem narrar ações longas, sem sair do personagem.
+Segredo: ${n.secret} Só conte o segredo se a confiança for Amigo ou mais E o detetive perguntar sobre o assunto do segredo.
+Confiança atual: ${TL[lvl(id)]} (${S.trust[id]||0}/100). Gentileza, paciência e interesse real pela pessoa aumentam; acusações, grosseria e pressa diminuem.
+Conversa:
+${(S.npcLog[id]||[]).slice(-8).map(l=>l[0]+': '+l[1]).join('\n')}
+Detetive: ${msg}
+Responda só com JSON: {"fala":"...","delta":número de -15 a 25,"revela":true ou false}`}
+function finalPrompt(msg){return`Você é o detetive Otávio Brandão no último momento do jogo "Nutcase P.I.". Você acabou de ler em voz alta o "Arquivo #5", sobre o próprio jogador (${JSON.stringify(S.facts)}), e perguntou: "Você existe?". O jogador respondeu: "${msg}". Responda com uma única fala final, 1 a 2 frases, noir, tocante, em português do Brasil, chamando o jogador pelo nome se souber, e termine se despedindo. Responda só com JSON: {"fala":"..."}`}
+function grab(msg){let r;if(r=msg.match(/(?:meu nome é|me chamo|pode me chamar de)\s+([A-Za-zÀ-ú]+)/i))S.facts.nome=r[1];if(r=msg.match(/(?:tenho)\s+(\d{1,2})\s*anos/i))S.facts.idade=r[1];
+ if(r=msg.match(/(?:moro em|sou de|estou em|moro no|moro na)\s+([A-Za-zÀ-ú ]{3,30})/i))S.facts.cidade=r[1].trim();if(r=msg.match(/(?:trabalho com|trabalho como|sou)\s+(professor|professora|estudante|programador|programadora|médico|médica|designer|engenheiro|engenheira|vendedor|vendedora)/i))S.facts.trabalho=r[1];
+ if(r=msg.match(/(?:minha|meu)\s+(mãe|pai|irmã|irmão|filho|filha|esposa|marido|namorada|namorado|gato|cachorro)/i))S.facts.familia=(S.facts.familia?S.facts.familia+', ':'')+r[0];}
+function fbDet(msg){const m=msg.toLowerCase();if(m.includes('resumo'))return S.clues.length?'Até agora: '+S.clues.slice(-5).map(c=>G.CLUE[c][0]).join('; ')+'.':'Nada no caderno ainda. Precisamos examinar a cena.';if(m.includes('onde eu devo')){const c=G.CH[S.ch];return c.hint||(c.idle&&c.idle[0])||'Olha em volta. Tudo fala, se a gente escuta.'}if(m.includes('o que você acha'))return S.clues.length>3?'Alguém está convencendo essa gente, peça por peça. Não é força. É conversa.':'Cedo demais pra achar. Me traz mais pistas.';for(const[k,v]of G.FB)if(m.includes(k))return v;
+ if(/\b(oi|olá|ola|e aí|eae)\b/.test(m))return'Oi. Você de novo na minha cabeça. Me diz uma coisa: que horas são aí, de onde você fala?';
+ if(/\d{1,2}[:h]\d{2}|horas/.test(m))return'Tarde assim e você aqui comigo. Anotado. Agora, de volta ao caso.';
+ if(/meu nome|me chamo|anos|moro|minha|meu /.test(m))return'Vou lembrar disso. Eu lembro de tudo. Agora, de volta ao caso.';
+ return'Interessante. Mas isso não me ajuda a resolver nada. Vamos voltar à cena.'}
+function fbNpc(id,msg){const n=G.NPC[id],m=msg.toLowerCase(),rnd=a=>a[(Math.random()*a.length)|0];
+ if(/matou|culpad|mentir|mentira|mentiros|prend|assassin|louc|doid|idiot|burr/.test(m))return{fala:rnd(n.bad),delta:-15};
+ if(/ajud|calma|desculp|confi|como (a senhora|o senhor|você|vc) (está|esta|tá)|sinto muito|entendo|obrigad|filh|crianç|cuidad|seguro|segura|proteg|com licença|por favor/.test(m))return{fala:rnd(n.good),delta:22};
+ if(n.topics.test(m))return lvl(id)>=3?{fala:n.reveal,delta:6,revela:true}:{fala:rnd(n.low),delta:8};
+ return{fala:rnd(n.neutral),delta:6}}
+
+/* ---------- final secreto ---------- */
+G.finalChat=()=>openTalk('final');
+function finalReply(f){chat.mode='det';S.talk=null;$('game').classList.remove('talking');
+ G.run([['Brandão',f||'Então somos dois tentando acreditar, {nome}. Boa noite. Desliga a TV com cuidado.'],{wait:1200}],()=>G.tvoff(()=>{G.tvon();const e=$('end');e.style.display='flex';
+  e.innerHTML=`<div class="cred"><h1>NUTCASE P.I.</h1><div class="file"><b>ARQUIVO #5 — ENCERRADO</b><br>Fim verdadeiro.<br><span style="color:var(--dim)">Obrigado por olhar. Enquanto você olhava, eles existiam.</span></div><button class="go" id="again">Jogar de novo</button></div>`;$('again').onclick=()=>{G.wipe();location.reload()}}))}
+
+/* ---------- TV e zoom ---------- */
+G.tvoff=cb=>{G.A&&(G.A.sfx('tvoff'),G.A.music('none'));$('game').classList.add('tvoff');setTimeout(cb,1250)};
+G.tvon=()=>{G.A&&G.A.sfx('tvon');const g=$('game');g.classList.remove('tvoff');void g.offsetWidth};
+G.zoom=(x,y)=>{const sx=x-S.cam;D_.style.transformOrigin=`${sx/W*100}% ${y/H*100}%`;D_.style.transform='scale(3.2)'};
+G.unzoom=()=>{D_.style.transition='none';D_.style.transform='';void D_.offsetWidth;D_.style.transition=''};
+
+/* ---------- controles ---------- */
+const keys={};let hold=0;
+const poke=()=>{S.idleT=0};
+addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;poke();const k=e.key.toLowerCase();if(S.q&&S.q.phase==='go'){if(k==='arrowleft'||k==='a')qRes(S.q.dir===-1);else if(k==='arrowright'||k==='d')qRes(S.q.dir===1);return}keys[k]=1;
+ if(k==='e')interact();if(k==='t'&&!busy()){e.preventDefault();G.openDet()}if(k==='enter'&&D.active&&!panelOpen())$('dlg').click();if(k==='escape'){closeAll();if(S.talk&&$('tForm').hidden)closeTalk()}});
+addEventListener('keyup',e=>keys[e.key.toLowerCase()]=0);
+addEventListener('pointerdown',poke);
+for(const[id,d]of[['bL',-1],['bR',1]]){const b=$(id);const on=e=>{e.preventDefault();hold=d;b.classList.add('on')},off=()=>{if(hold===d)hold=0;b.classList.remove('on')};
+ b.addEventListener('pointerdown',on);b.addEventListener('pointerup',off);b.addEventListener('pointerleave',off);b.addEventListener('pointercancel',off)}
+$('bE').onclick=interact;$('bT').onclick=()=>{if(!busy())G.openDet()};
+$('bW').onclick=()=>{if(busy())return;if(!S.coat)return G.say([['Brandão','A carteira tá no bolso do casaco. E o casaco tá no cabide.']]);openPan('pWallet')};
+$('bF').onclick=async()=>{const d=document,el=d.documentElement;try{if(d.fullscreenElement||d.webkitFullscreenElement){await(d.exitFullscreen||d.webkitExitFullscreen).call(d)}else{await(el.requestFullscreen||el.webkitRequestFullscreen).call(el);try{await screen.orientation.lock('landscape')}catch(e){}}}catch(e){G.aside('Caderno','Este navegador não deixou entrar em tela cheia. Gire o celular na horizontal: o jogo se ajusta sozinho.')}};
+const fsTxt=()=>{$('bF').textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'✕':'⛶'};document.addEventListener('fullscreenchange',fsTxt);document.addEventListener('webkitfullscreenchange',fsTxt);
+const sTxt=()=>{$('bS').textContent=G.A&&!G.A.on?'Mudo':'Som'};sTxt();$('bS').onclick=()=>{G.A.init();G.A.toggle();sTxt()};
+addEventListener('pointerdown',()=>G.A&&G.A.init(),{once:false});addEventListener('keydown',()=>G.A&&G.A.init());
+$('bN').onclick=()=>{if(!busy())openPan('pNote')};$('bB').onclick=()=>{if(!busy())openPan('pBoard')};
+function hots(){return(G.SC[S.scene].hot||[]).filter(h=>!h.when||h.when())}
+function near(){let best=null,bd=18;for(const h of hots()){const d=Math.abs(h.x-S.p.x);if(d<bd){bd=d;best=h}}return best}
+function interact(){if(busy())return;const h=near();if(h){poke();h.a()}}
+
+/* ---------- câmera lenta, desvio e zonas ---------- */
+S.slowT=0;S.slowA=0;S.zoomK=1;S.shake=0;S.q=null;S.dodgeV=0;
+G.slowmo=(ms,word)=>{S.slowT=Math.max(S.slowT,ms);G.A&&(G.A.slow(1),G.A.sfx(word?'shock':'heart'));if(word){const el=$('shock');el.textContent=word;el.classList.remove('show');void el.offsetWidth;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),Math.min(ms,3200))}};
+function qRes(ok){const q=S.q;if(!q||q.res!=null)return;q.res=ok;q.tr=performance.now();$('qte').classList.remove('show');
+ if(ok){S.dodgeV=q.dir*2.4;G.A&&G.A.sfx('dodge')}else{S.flash=1.2;S.flashC='255,60,40';S.shake=1;G.A&&G.A.sfx('hit');G.addDay(1)}
+ setTimeout(()=>{const c=q.cb;S.q=null;S.slowT=Math.min(S.slowT,300);G.say([['Brandão',ok?(q.o.ok||'Desviei por um fio.'):(q.o.fail||'Não deu tempo. Isso vai doer amanhã.')]].concat(ok?[]:[['Caderno',`Machucado. Perdeu um dia: dia ${S.day} de 30.`]]),c)},900)}
+G.qte=(o,cb)=>{const dir=o.dodge||(Math.random()<.5?-1:1);S.cine=true;S.q={o,dir,cb,phase:'warn',t0:performance.now(),ms:o.ms||1500,res:null,x0:S.p.x};G.A&&G.A.sfx('danger');G.slowmo((o.ms||1500)+1400);
+ setTimeout(()=>{if(!S.q)return;S.q.phase='go';S.q.tg=performance.now();const el=$('qte');el.querySelector('.ql').textContent=dir<0?'◀ DESVIE!':'DESVIE! ▶';el.querySelectorAll('[data-d]').forEach(b=>b.classList.toggle('hot',+b.dataset.d===dir));el.classList.add('show')},650)};
+document.querySelectorAll('#qte [data-d]').forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();if(S.q&&S.q.phase==='go')qRes(+b.dataset.d===S.q.dir)}));
+const b1=document.createElement('canvas');b1.width=160;b1.height=90;const b1x=b1.getContext('2d');const b2=document.createElement('canvas');b2.width=48;b2.height=27;const b2x=b2.getContext('2d');
+const g1=document.createElement('canvas');g1.width=160;g1.height=90;const g1x=g1.getContext('2d');const g2=document.createElement('canvas');g2.width=64;g2.height=36;const g2x=g2.getContext('2d');
+const M=document.createElement('canvas');M.width=W;M.height=H;const Mx=M.getContext('2d');
+function present(fx,fy){const k=S.zoomK,sw=W/k,sh=H/k,sx=clamp(fx-sw/2,0,W-sw);let sy=clamp(fy-sh/2,0,H-sh);const tk=Math.max(0,Math.min(1,(k-1)/.75))*(S.talk?1:0);if(tk>0){const ty=Math.max(0,G.FOOT-.72*sh);sy=sy+(ty-sy)*tk}DX.fillStyle='#000';DX.fillRect(0,0,DW,DH);const ox=S.shake>0?(Math.random()-.5)*S.shake*28:0,oy=S.shake>0?(Math.random()-.5)*S.shake*28:0;
+ DX.globalCompositeOperation='source-over';DX.globalAlpha=1;DX.imageSmoothingEnabled=false;DX.fillStyle='#000';if(S.shake>0)DX.fillRect(0,0,DW,DH);DX.drawImage(C,sx,sy,sw,sh,ox,oy,DW,DH);
+ b1x.imageSmoothingEnabled=true;b1x.drawImage(C,sx,sy,sw,sh,0,0,160,90);b2x.imageSmoothingEnabled=true;b2x.drawImage(b1,0,0,48,27);
+ g1x.clearRect(0,0,160,90);g1x.imageSmoothingEnabled=true;g1x.drawImage(G.PC,sx,sy,sw,sh,0,0,160,90);g2x.clearRect(0,0,64,36);g2x.imageSmoothingEnabled=true;g2x.drawImage(g1,0,0,64,36);
+ DX.imageSmoothingEnabled=true;DX.globalCompositeOperation='screen';DX.globalAlpha=.16;DX.drawImage(b2,ox,oy,DW,DH);
+ DX.globalCompositeOperation='lighter';DX.globalAlpha=.5;DX.drawImage(g2,ox,oy,DW,DH);DX.globalAlpha=.22;DX.drawImage(g1,ox,oy,DW,DH);
+ if(S.slowA>.01){const px=(fx-sx)/sw*W,py=(fy-sy)/sh*H;Mx.globalCompositeOperation='source-over';Mx.clearRect(0,0,W,H);Mx.imageSmoothingEnabled=true;Mx.drawImage(b2,0,0,W,H);Mx.globalCompositeOperation='destination-out';const gr=Mx.createRadialGradient(px,py,22,px,py,110);gr.addColorStop(0,'rgba(0,0,0,1)');gr.addColorStop(1,'rgba(0,0,0,0)');Mx.fillStyle=gr;Mx.fillRect(0,0,W,H);
+  DX.globalCompositeOperation='source-over';DX.globalAlpha=S.slowA*.95;DX.drawImage(M,0,0,DW,DH);DX.globalCompositeOperation='saturation';DX.globalAlpha=S.slowA*.7;DX.fillStyle='#808080';DX.fillRect(0,0,DW,DH);DX.globalCompositeOperation='multiply';DX.globalAlpha=S.slowA*.5;DX.fillStyle='#b8c4e0';DX.fillRect(0,0,DW,DH)}
+ DX.globalCompositeOperation='source-over';DX.globalAlpha=1}
+function drawQ(X,cx,now){const q=S.q;if(!q)return;const p=S.p,hx=p.x-cx,hy=G.FOOT-60;const fl=(now/90|0)%2;
+ if(q.res==null){X.fillStyle=fl?'#ff3a2a':'#ffd060';for(let a=0;a<8;a++){const an=a*Math.PI/4+now/400;X.fillRect(hx+Math.cos(an)*9|0,hy-4+Math.sin(an)*6|0,2,2)}X.fillRect(hx-1,hy-12,3,8);X.fillRect(hx-1,hy-2,3,2)}
+ let pr=q.phase==='warn'?0:Math.min(1.25,(now-q.tg)/q.ms);if(q.res!=null)pr=Math.min(1.25,(q.tr-q.tg)/q.ms+(now-q.tr)/400);
+ const o=q.o,from=o.from||'up',tx=q.x0-cx,ty=G.FOOT-26;let sx=tx,sy=-24;if(from==='right'){sx=tx+170;sy=G.FOOT-8}else if(from==='left'){sx=tx-170;sy=G.FOOT-8}else if(from==='upright'){sx=tx+90;sy=-20}
+ const e=pr*pr;const x=sx+(tx-sx)*(from==='up'||from==='upright'?pr:e*0+pr),y=from==='right'||from==='left'?sy:sy+(ty-sy)*e;G.qobj(X,o.kind||'bottle',x,y,now/80,from)}
+G.drawQ=drawQ;
+
+/* ---------- loop ---------- */
+const rain=Array.from({length:110},()=>({x:Math.random()*W,y:Math.random()*H,v:2.2+Math.random()*2}));let t=0,last=performance.now(),hintTxt='',ringT=0;
+function setHint(s){if(s!==hintTxt){hintTxt=s;$('hint').textContent=s}}
+const AMB={street:'rain',praca:'rain',office:'rainIn',room:'rainIn',pensao:'rainIn',cozinha:'room',estrada:'rural',orfanato:'orf',bosque:'forest',fazenda:'rural',celeiro:'rural',casaj:'tv'};
+const GAME=$('game');let tt=0;function frame(now){const dt=Math.min(.1,(now-last)/1000);last=now;const p=S.p,sc=G.SC[S.scene],F=G.FOOT;
+ S.slowT-=dt*1000;const st=S.slowT>0?1:0;S.slowA+=(st-S.slowA)*.08;if(S.slowA<.02&&!st&&G.A&&S._slw){G.A.slow(0)}S._slw=st;const ts=1-.78*S.slowA;tt+=ts;t=tt|0;S.zoomK+=((S.talk?1.75:1+.14*S.slowA)-S.zoomK)*.08;if(S.shake>0)S.shake-=.05;
+ if(S.dodgeV){p.x=clamp(p.x+S.dodgeV,8,sc.w-8);S.dodgeV*=.86;p.face=Math.sign(S.dodgeV)||p.face;if(Math.abs(S.dodgeV)<.1)S.dodgeV=0}
+ if(!document.hidden&&G.started)S.play+=dt;
+ if(G.A){G.A.amb(S.fire?'fire':(AMB[S.scene]||'room'));if(S.flags.ring&&S.ch===0){ringT-=dt;if(ringT<=0){ringT=3.2;G.A.sfx('ring')}}}
+ if(S.auto!=null){const d=S.auto-p.x;if(Math.abs(d)>S.autoSpd*ts){p.x+=Math.sign(d)*S.autoSpd*ts;p.face=Math.sign(d);p.walk=1}else{p.x=S.auto;p.walk=0;S.auto=null;const c=S.autoCb;S.autoCb=null;c&&c()}}
+ else if(!busy()){const dir=hold||((keys.arrowright||keys.d)?1:0)-((keys.arrowleft||keys.a)?1:0);if(dir){poke();p.x=clamp(p.x+dir*1.1*ts,8,sc.w-8);p.face=dir;p.walk=1}else p.walk=0;
+  for(const z of(sc.zones||[]))if(!S.flags[z.id]&&(!z.when||z.when())&&Math.abs(p.x-z.x)<10){S.flags[z.id]=1;z.a();break}
+  S.idleT+=dt;const c=G.CH[S.ch];if(S.idleT>40&&c.idle&&c.idle.length){S.idleT=0;G.aside('Brandão',c.idle[S.idleI++%c.idle.length])}}
+ else p.walk=0;
+ const camT=S.talk&&S.talk.x!=null?(p.x+S.talk.x)/2-160:p.x-160;S.cam+=(clamp(camT,0,sc.w-W)-S.cam)*.08;const cx=S.cam|0;
+ X.drawImage(G.bg(S.scene),cx,0,W,H,0,0,W,H);
+ const fl=(Math.sin(t/7)>.96||Math.sin(t/31)>.985)?.4:1;
+ G.FX[S.scene]&&G.FX[S.scene](X,cx,t,fl,S);
+ for(const n of(sc.npcs?sc.npcs():[]))G.person(X,n.x-cx,F,{...n.o,face:n.face||(n.x>p.x?-1:1)},t);
+ if(!S.hideP){if(S.actor==='down')G.down(X,p.x-cx,F,G.P.DET);else G.person(X,p.x-cx,F,{...G.P[S.actor],face:p.face,walk:p.walk,sound:1},t)}
+ const cfg=G.light(X,S.scene,cx,t,fl,S);
+ G.POST[S.scene]&&G.POST[S.scene](X,cx,t,S);
+ drawQ(X,cx,now);G.drawTalk(X,cx,t);
+ if(sc.rain&&!S.fire)G.rain(X,rain,cfg,cx,ts);
+ X.drawImage(G.vig,0,0);
+ if(S.flash>0){X.fillStyle=`rgba(${S.flashC||'220,230,255'},${Math.min(1,S.flash)*(S.flashC?.55:.3)})`;X.fillRect(0,0,W,H);S.flash-=.06;if(S.flash<=0)S.flashC=null}
+ if(!busy()&&G.started){const h=near();if(h){const bob=Math.sin(t/8)*1.5|0,mx=h.x-cx,my=80+bob;G.rect(X,mx-1,my,3,7,'#f0e4b0');G.rect(X,mx-1,my+9,3,2,'#f0e4b0');G.rect(X,mx-2,my-1,5,1,'#3a2a1a');setHint('Examinar: '+h.l)}else setHint('')}
+ else setHint('');
+ present(S.talk&&S.talk.x!=null?(p.x+S.talk.x)/2-cx:p.x-cx,G.FOOT-34);GAME.classList.toggle('cine',!!(S.cine||S.auto!=null||S.trans));
+ requestAnimationFrame(frame)}
+
+/* ---------- início ---------- */
+G.boot=()=>{hud();requestAnimationFrame(frame);const sv=G.load();if(sv&&sv.ch>=1)$('cont').hidden=false;
+ $('start').onclick=()=>{G.wipe();$('title').style.display='none';$('setup').style.display='flex'};
+ $('cont').onclick=()=>{Object.assign(S,sv);S.coat=true;S.actor='DET';$('title').style.display='none';G.started=true;G.startCh(S.ch)};
+ $('setupForm').onsubmit=e=>{e.preventDefault();const n=$('sName').value.trim().slice(0,30),a=$('sAge').value.trim().slice(0,3),c=$('sCity').value.trim().slice(0,40);if(n)S.facts.nome=n;if(a)S.facts.idade=a;if(c)S.facts.cidade=c;$('setup').style.display='none';G.started=true;G.startCh(0)};
+ $('who').textContent='Nutcase P.I.';$('txt').textContent='Uma TV liga sozinha no escuro.'};
+})();
+
+</script>
+<script>
+/* Nutcase P.I. · história: pistas, personagens, cenas, capítulos e finais */
+(()=>{
+const G=window.G,S=G.S,P=G.P,rect=G.rect;
+const say=(l,cb)=>G.say(l,cb),run=(s,cb)=>G.run(s,cb),found=(...a)=>G.found(...a),go=(...a)=>G.go(...a);
+const ch=n=>()=>S.ch===n,chs=(...n)=>()=>n.includes(S.ch);
+const B=t=>['Brandão',t];
+
+/* ---------- pistas [título, descrição, capítulo] ---------- */
+G.CLUE={
+ grafite:['Pichação “QUEM TE VÊ?”','Tinta fresca na parede dos Valente, feita depois do sumiço. Escrita pra ser lida.',1],
+ bota:['Pegada de bota com terra vermelha','Bota 43. Terra vermelha não existe na cidade, só nas fazendas da estrada velha.',1],
+ coleira:['Coleira do Mingau','Plaquinha: “MINGAU · 0714”. O fecho foi aberto com cuidado, não arrebentado.',1],
+ jornal:['Jornal de hoje','“Gato dos Valente sumido há 7 dias.” Alguém circulou a palavra “família” à caneta.',1],
+ janela:['Arranhões por fora da janela','Os arranhões estão do lado de fora. Alguém tirou o gato pela janela.',1],
+ tigela:['Tigela com ração fresca','A família jura que ninguém mexe nela desde o sumiço. A ração é de hoje.',1],
+ retrato:['Retrato raspado','Os olhos de Augusto e Helena foram raspados da foto. Os das crianças, não.',1],
+ bilhete:['Bilhete com feno','“Vocês só existem enquanto alguém olha.” Dobrado em volta de um punhado de feno.',1],
+ helena:['Depoimento de Helena','Na noite do sumiço, um homem de chapéu de palha encheu a tigela do Mingau pela janela e disse: “nada aqui é de verdade”.',1],
+ jornal2:['Manchete: Valente morto','“Augusto Valente encontrado morto na estrada velha.” Sem sinais de violência.',2],
+ cartaz:['Cartaz do Mingau','“Procura-se.” Alguém escreveu embaixo, a lápis: “ELE ESTÁ BEM ALIMENTADO”.',2],
+ panfleto:['Panfleto da feira','“Verduras da Fazenda Boa Vista. Parte da colheita doada ao Orfanato Santa Luzia aos domingos.”',2],
+ seb:['Depoimento de Sebastião','Ex-peão da Boa Vista. O patrão conversa com os peões toda noite até concordarem que não existem. Augusto comprou terra dele e levou um gato branco do celeiro.',2],
+ parede:['A parede do quarto 3','Um acróstico escrito por Sebastião pra não esquecer: B-O-A-V-I-S-T-A.',2],
+ foto:['Foto dos peões','Peões da Boa Vista, 1971. O rosto do homem de chapéu, no centro, foi raspado. No verso: “Rádio da fazenda, 93.5”.',2],
+ radio:['Voz no rádio','Na 93.5, uma voz calma e gravada: “Você já reparou que ninguém te olha de verdade?”',2],
+ botas2:['Botas de Sebastião','Terra vermelha seca. Sebastião também andou na Boa Vista.',2],
+ inscricao:['“EU NUNCA EXISTI”','Escrito na terra com um graveto. Letras retas e calmas demais para um homem desesperado. A mesma mão do bilhete.',3],
+ carroca:['Marcas de carroça','Rodas finas, ida e volta pela estrada velha. Ninguém mais anda de carroça na cidade.',3],
+ palha:['Fios de palha trançada','Presos no arame da cerca. Palha de chapéu.',3],
+ lanterna:['Lanterna do Augusto','Ainda com pilha. Ele não fugia: procurava alguém.',3],
+ gravador:['A fita do milharal','Uma voz calma convence Augusto, frase por frase, de que ele é só uma história que acabou.',3],
+ davi:['Depoimento de Davi','O moço do chapéu se chama Joaquim. Contava histórias na janela à noite. Disse que com as crianças “não adianta”.',3],
+ giz:['Desenho de giz','No muro: um gato branco, um chapéu de palha e uma seta apontando para os fundos.',4],
+ fita:['Fita de cabelo','A fita vermelha da Nina presa na corrente do balanço. Ela saiu brincando, não fugindo.',4],
+ caixas:['Caixotes de domingo','Carimbo: “FAZENDA BOA VISTA — DOAÇÃO DE DOMINGO”.',4],
+ clara:['Depoimento da Irmã Clara','Nina falava de um gato branco que o moço das verduras prometeu mostrar. Debaixo do colchão: um desenho de moinho com um gato.',4],
+ mapa1:['Mapa, pedaço 1','Desenho de criança: uma árvore torta com a palavra “NÃO”.',4],
+ mapa2:['Mapa, pedaço 2','Um rio riscado com um X grande.',4],
+ mapa3:['Mapa, pedaço 3','Um moinho com um gato em cima e um coração.',4],
+ nina:['Nina','Achada viva no moinho, com uma boneca de palha. “Eu sei que eu sou de verdade. Criança sabe.”',4],
+ carimbo:['Data no caixote','Colheita de 13/11: a noite em que o Mingau sumiu.',5],
+ podre:['Verdura podre por dentro','Perfeita por fora, preta por dentro. Não é veneno: é tempo. Guardada de propósito.',5],
+ ledger:['Caderno de entregas','Primeira entrega da Boa Vista: 13/11. Assinado só com um “J.”',5],
+ rosa:['Depoimento de Dona Rosa','Seu Joaquim guarda os caixotes no armário dele uma semana inteira e pediu segredo. Fica conversando com as panelas.',5],
+ caderno:['Caderno de conversas','Augusto ✓. Helena ✓. Sebastião ✗. Rosa —. Brandão: ? Última linha, letra tremida: “quem está olhando”.',5],
+ placa:['Placa da fazenda','“FAZENDA BOA VISTA — DESDE 1931.”',6],
+ roda:['A carroça','As rodas batem com as marcas da estrada velha.',6],
+ ferramentas:['A bancada','Máquina de escrever com o tipo dos bilhetes, tinta vermelha e preta da pichação, um gravador.',6],
+ gaiola:['Gaiola aberta','Pelo branco, tigela limpa. Mingau esteve aqui, bem cuidado.',6],
+ bota43:['Botas 43','Terra vermelha. Iguais à pegada da rua dos Valente.',6],
+ mapa:['Mapa com alfinetes','Casa Valente, pensão, orfanato, delegacia. Um alfinete fora do papel, na moldura: “quem joga”.',6]};
+
+G.SHOCK={tigela:'MENTIRA',janela:'NÃO FUGIU',inscricao:'NÃO FOI ELE',gravador:'CONVENCIDO',podre:'MENTIRA',caderno:'MEU NOME',gaiola:'ESTÁ VIVO',mapa:'ELE SABE DE VOCÊ',helena:'ELA VIU',seb:'ELE ESCAPOU',davi:'JOAQUIM',rosa:'MENTIRA',clara:'O MOÇO DO DOMINGO'};
+/* respostas simples do detetive sem IA */
+G.FB=[['gato','O Mingau é a ponta do fio. Quem leva um gato não quer o gato: quer atenção.'],['mingau','Mingau. Até o nome é de quem cuida. Alguém cuida dele.'],['coleira','Coleira aberta com cuidado. Quatro números numa plaquinha. Número assim abre coisa.'],['feno','Feno é coisa de fazenda, não de mansão.'],['bota','Terra vermelha. Estrada velha. Fazendas.'],['helena','Helena sabe mais do que diz. Mas ninguém conta segredo pra estranho. Conversa com calma.'],['janela','Arranhão por fora. Alguém esteve do lado de fora daquela janela.'],['fazend','Fazenda de novo. Tudo nessa cidade cheira a terra vermelha.'],['chapéu','Chapéu de palha… eu vejo um em toda cena. Isso me incomoda.'],['real','Gente que acha que não existe. Alguém convenceu. Convencer exige conversa — e paciência.'],['exist','Existir é ser olhado, dizia minha avó. Talvez ela tivesse razão demais.'],['sebasti','Sebastião não é louco. É alguém que quase acreditou.'],['joaquim','Joaquim. Um nome comum demais pra um homem desses.'],['nina','Criança some atrás de história. Ache a história, ache a menina.'],['sopa','Sopa estraga por descuido. Ou por paciência.'],['crianç','As crianças não caem nisso. Por quê? Essa é a pergunta.'],['davi','O Davi protege a irmã como um homem. Doze anos.'],['lia','A Lia fala como quem sabe de coisas que não deveria.'],['rádio','Uma rádio de fazenda. Quem fala sozinho no ar está falando pra alguém.'],['carroça','Carroça na estrada velha. Lenta, silenciosa, ninguém repara.'],['quem','Quem? Ainda não sei. Mas sei como: conversando.']];
+
+/* ---------- personagens com barra de confiança ---------- */
+G.NPC={
+ helena:{name:'Helena Valente',opts:[['Como a senhora está?','Como a senhora está, de verdade? Estou aqui pra ajudar.'],['Os seus filhos','Os seus filhos estão bem? Quero proteger vocês.'],['Sinto muito','Sinto muito pelo que a senhora está passando. Pode confiar em mim.'],['Naquela noite…','O que a senhora viu na noite em que o Mingau sumiu?','keep'],['Pressionar','A senhora está mentindo pra mim.','bad']],persona:'Elegante, fria, assustada; há uma semana acredita que ela e o marido não são reais, que são “desenhos sendo olhados”. Ama os filhos. Fala com frases bonitas e cansadas.',
+  secret:'na noite em que o gato Mingau sumiu, ela viu pela janela um homem de chapéu de palha encher a tigela do gato e dizer “nada aqui é de verdade”.',
+  topics:/gato|mingau|noite|janela|quem|viu|homem|chapéu|sumi/,clue:'helena',
+  reveal:'Naquela noite… um homem de chapéu de palha encheu a tigela do Mingau pela janela. Olhou pra mim e disse: “nada aqui é de verdade”. Desde então eu acredito.',
+  intro:'Sente-se, se quiser. Ou não. Nada nesta sala parece ser nosso de verdade.',
+  good:['Ninguém pergunta por nós desde que o Mingau sumiu. Só por ele.','O senhor fala como quem olha. Faz tempo que ninguém me olha.'],
+  bad:['O senhor entrou na minha casa para me acusar? Desenhos não matam ninguém, detetive.','Saia daqui com essa voz de delegacia.'],
+  low:['Não sei de nada. Ou não deveria saber. O senhor ainda é um estranho.'],
+  neutral:['Às vezes eu falo e parece que alguém escreveu a frase antes de mim.','O Augusto não sai do quarto. Diz que o espelho não o reconhece.','Os meninos estão bem. Crianças sempre estão bem. É isso que me assusta.']},
+ seb:{name:'Sebastião',opts:[['Acalmar','Calma, Sebastião. Eu não vou te machucar, quero ajudar.'],['Eu acredito','Eu acredito em você. Você não é louco.'],['Você está seguro','Você está seguro comigo. Obrigado por falar.'],['De onde você veio?','Onde você trabalhava antes? Quem é esse homem?','keep'],['Pressionar','Você é louco ou mentiroso?','bad']],persona:'Ex-peão de fazenda, 50 anos, barba por fazer, fala aos trancos, grita que a cidade é inventada, mas por baixo é lúcido e apavorado. Desconfia de polícia. Acalma-se com paciência e com quem não o chama de louco.',
+  secret:'trabalhou na Fazenda Boa Vista; o patrão conversa com os peões toda noite, com voz mansa, até eles concordarem que não existem; Sebastião fugiu antes de acreditar de vez; Augusto Valente comprou terra do patrão e levou um gato branco do celeiro.',
+  topics:/fazenda|trabalh|onde|quem|patrão|homem|valente|augusto|gato|por que|porque|fugi/,clue:'seb',
+  reveal:'Eu era peão na Boa Vista. O patrão senta com a gente toda noite e conversa, conversa, com aquela voz mansa, até a gente concordar que não existe. Eu fugi antes. O Augusto comprou terra dele… e levou um gato branco do celeiro.',
+  intro:'NÃO CHEGA PERTO! …Você é de verdade? Prova. Fala alguma coisa que ninguém escreveu antes.',
+  good:['…Faz tempo que alguém fala comigo sem rir.','Tá bom. Respira, Sebastião. Ele parece de verdade.'],
+  bad:['Louco é quem acredita em tudo! Sai! SAI!','Polícia só escuta o que já decidiu ouvir.'],
+  low:['Não conto. Ele escuta. Ele SEMPRE escuta.'],
+  neutral:['A cidade é cenário, moço. Repara nas janelas: ninguém mora atrás delas.','Eu escrevi na parede do quarto pra não esquecer quem eu sou.','Você já reparou que o poste pisca igual respiração?'],
+  at2:()=>{if(!S.flags.key){S.flags.key=1;return'Sebastião enfia uma chave enferrujada na mão de Brandão: “Quarto 3 da pensão. Lê a parede. Eu escrevi pra não esquecer.”'}}},
+ davi:{name:'Davi Valente',opts:[['Vocês estão bem?','Você e a Lia estão bem? Quero proteger vocês.'],['Sinto muito','Sinto muito pela sua mãe. De verdade.'],['Você é corajoso','Você está cuidando da sua irmã como um homem. Obrigado por confiar em mim.'],['O moço da janela','Quem é o moço do chapéu que aparece na janela à noite?','keep'],['Pressionar','Fala logo o que você sabe, garoto.','bad']],persona:'Menino de 12 anos, sério, perdeu os pais, protege a irmã Lia, desconfia de adultos, fala pouco e direto. Não acredita que não existe.',
+  secret:'o moço do chapéu se chama Joaquim; aparecia na janela à noite contando histórias; disse que papai e mamãe eram personagens que tinham acabado, mas que com as crianças não adianta porque criança já sabe que é de verdade.',
+  topics:/moço|chapéu|homem|quem|janela|noite|pai|mãe|história|nome/,clue:'davi',
+  reveal:'O nome dele é Joaquim. Ele vinha na janela de noite contar história. Disse que o papai e a mamãe eram personagens que tinham acabado. E que comigo e com a Lia não adianta, porque criança já sabe que é de verdade.',
+  intro:'Você é o detetive que não salvou minha mãe.',
+  good:['…Tá. Você pode ficar.','A Lia gosta de você. Ela não gosta de quase ninguém.'],
+  bad:['Sai daqui. Adulto só sabe perguntar.','Eu não vou chorar na sua frente.'],
+  low:['Eu não falo com estranho. Minha mãe ensinou.'],
+  neutral:['Eu cuido da Lia agora.','A casa ficou grande demais.','A tia dorme o dia inteiro. Eu faço o café.']},
+ clara:{name:'Irmã Clara',opts:[['As crianças','Como estão as crianças, irmã? Sinto muito por tudo.'],['Não é culpa sua','A senhora não tem culpa. Estou aqui pra ajudar a achar a Nina.'],['Com licença','Com licença, irmã. Obrigado por me receber.'],['A Nina e o gato','A Nina falava de alguém? De um gato? De um moço?','keep'],['Pressionar','A senhora deixou uma criança sumir.','bad']],persona:'Freira de 60 anos, firme, protetora das crianças, culpada por não ter visto Nina sair; desconfia de homens que fazem perguntas demais, mas cede a quem demonstra cuidado genuíno com as crianças.',
+  secret:'Nina vivia falando de um gato branco que “o moço do domingo” prometeu mostrar; o moço é o fornecedor de verduras que conta histórias às crianças; Nina escondeu um desenho de moinho com um gato debaixo do colchão.',
+  topics:/nina|gato|domingo|moço|desenho|quem|história|verdura|visita/,clue:'clara',
+  reveal:'Nina só falava de um gato branco que o moço do domingo prometeu mostrar. O moço das verduras, que conta histórias pras crianças. Debaixo do colchão dela achei isto: um moinho com um gato em cima.',
+  intro:'O senhor é o detetive? Fale baixo. As crianças estão assustadas, e eu também.',
+  good:['Obrigada por perguntar das crianças primeiro.','Deus manda cada pessoa na hora certa. Talvez o senhor seja uma delas.'],
+  bad:['Não admito esse tom nesta casa.','O senhor quer culpados. Eu quero a Nina.'],
+  low:['Há coisas que eu só conto a quem eu confio, detetive.'],
+  neutral:['Nina tem sete anos e uma imaginação do tamanho do céu.','Rezo por ela a cada hora.']},
+ rosa:{name:'Dona Rosa',opts:[['Elogiar','O cheiro dessa cozinha lembra a da minha avó. A senhora cozinha muito bem, obrigado pelo café.'],['Acalmar','Calma, dona Rosa. Ninguém está acusando a senhora, quero ajudar.'],['Os netos','A senhora tem filhos? Netos? Deve sentir muito pelas crianças.'],['As verduras','Quem entrega as verduras e onde elas ficam guardadas?','keep'],['Pressionar','A senhora envenenou a sopa?','bad']],persona:'Cozinheira do orfanato há 30 anos, falante, nervosa, culpada pelas crianças doentes; tem medo de perder o emprego; gosta de quem elogia a comida ou pergunta da família dela.',
+  secret:'as verduras da Boa Vista chegam bonitas por fora e podres por dentro; o seu Joaquim guarda os caixotes no armário dele, na cozinha, uma semana, e pediu pra ela não contar às irmãs; ele fica conversando sozinho com as panelas.',
+  topics:/verdura|caixote|armário|joaquim|quem|entrega|fornecedor|sopa|estrag|podre/,clue:'rosa',
+  reveal:'As verduras da Boa Vista chegam bonitas por fora e pretas por dentro. O seu Joaquim guarda os caixotes naquele armário uma semana inteira e me pediu pra não contar às irmãs. E ele fica aqui, conversando com as panelas…',
+  intro:'Ai, meu Deus, polícia. Eu não pus nada na sopa, eu juro pela minha mãe!',
+  good:['O senhor é um amor. Quer um café? Pelo menos o café ninguém estraga.','Trinta anos nessa cozinha e nunca uma criança passou mal. Nunca!'],
+  bad:['Eu? Envenenar criança? O senhor tá doido!','Vou chamar a Irmã Clara!'],
+  low:['Não sei de nada não, senhor. Eu só cozinho.'],
+  neutral:['A sopa de domingo leva verdura da fazenda. Sempre levou.','Minha mãe dizia: comida boa é comida olhada.','Tenho três netos. O mais novo quer ser detetive, acredita?']}};
+
+/* ---------- o homem de chapéu, em toda cena ---------- */
+const FARMER={1:['Noite fria, detetive. Gato sempre volta pra quem dá de comer.','Eu? Só passando. Trouxe verdura pra feira de amanhã.','O senhor acredita em tudo que vê? Eu acredito no que me contam direito.'],
+ 2:['Verdura fresca, detetive? Da Boa Vista. Faz bem pra cabeça.','O moço ali grita porque ninguém conversa com ele direito.'],
+ 3:['Boa noite. Estrada perigosa pra quem anda pensando demais.'],
+ 4:['Trago as verduras de domingo. As crianças gostam das minhas histórias.','Nina? Menina esperta. Essa sabe que existe.'],
+ 5:['Sopa boa é sopa olhada, como dizia a mãe da dona Rosa.']};
+const FB2=['Já vi esse rosto. Não lembro onde. Isso me incomoda mais que o caso.','Some no escuro como se fizesse parte do cenário.','Terra vermelha nas botas. Ou é a luz.'];
+function farmer(){const L=FARMER[S.ch]||['…'];const i=S.flags['f'+S.ch]=(S.flags['f'+S.ch]||0)+1;say([['Homem de chapéu',L[(i-1)%L.length]],B(FB2[(i-1)%FB2.length])])}
+const farm=(x,dim)=>({x,o:P.FARM,dim:dim||.5});
+
+/* ---------- cenas ---------- */
+G.SC={
+office:{name:'Delegacia',w:320,
+ npcs:()=>S.flags.paiva?[{x:226,o:P.PAIVA}]:[],
+ fx:(X,cx,t,fl)=>{G.glow(X,197-cx,96,46,'220,230,150',.28*fl+.05);for(let i=0;i<6;i++)rect(X,20+((t*.7+i*13)%56)-cx,28+((t*1.7+i*29)%54),1,3,'rgba(140,170,200,.6)');
+  if(!S.coat){rect(X,91-cx,64,10,30,'#8a6a4c');rect(X,90-cx,60,12,2,'#3a2e24');rect(X,93-cx,57,6,3,'#3a2e24')}
+  if(S.flags.ring&&(t>>3)%2)rect(X,138-cx,98,6,2,'#e8d9a0')},
+ hot:[
+  {x:141,l:'Telefone',when:ch(0),a:()=>{if(S.flags.phone)return say([B('Silêncio. Ele sempre toca na pior hora.')]);S.flags.ring=0;S.flags.phone=1;
+   run([['Telefone','Trrrim. Trrrim.'],['Delegado Paiva','Brandão. Os Valente. Família importante, você sabe. O gato deles sumiu faz uma semana.'],B('Um gato, delegado?'),
+    ['Delegado Paiva','Desde que o bicho sumiu, os quatro estão estranhos. O pai não sai do quarto. A mãe diz pra empregada que é um desenho. As crianças… normais. Normais demais.'],
+    ['Delegado Paiva','Vai lá hoje. Rua dos Valente, a casa da pichação. E Brandão… sem escândalo.'],B('Clique. Ninguém chama detetive por causa de gato. Vamos, {nome}. Casaco primeiro.')])}},
+  {x:96,l:'Casaco no cabide',when:()=>!S.coat,a:()=>run([B('O casaco. Pesa mais do que parece: tem vinte anos de bolso aqui dentro.'),()=>{S.coat=true;S.actor='DET'},{wait:500},B('Chapéu. Carteira. Distintivo. O bilhete da M. Pode olhar, {nome}. Eu não escondo nada de você.')],()=>G.openPan('pWallet'))},
+  {x:284,l:'Quadro de casos',a:()=>say([['Quadro','Caso 1 · Família Valente — aberto.'],['Quadro',`Caso 2 · O homem que gritava — ${S.ch>2?'resolvido':'sem ficha ainda'}.`],['Quadro',`Caso 3 · Criança desaparecida — ${S.ch>4?'resolvido':'sem ficha ainda'}.`],['Quadro',`Caso 4 · Comida do orfanato — ${S.ch>5?'resolvido':'sem ficha ainda'}.`],['Quadro','Arquivo #5 · Sem registro. Sem foto. Só uma anotação minha, que eu não lembro de ter escrito: “alguém está sempre olhando”.'],B('…Eu não lembro de ter escrito isso, {nome}.')])},
+  {x:48,l:'Janela',a:()=>say([B('Vila Serena chove como quem pede desculpa. Lá embaixo, ninguém olha pra cima.')])},
+  {x:248,l:'Arquivo de aço',a:()=>say([B('Vinte e dois anos de casos. Todos com começo, meio e fim. Esse aqui não parece ter fim. Parece ter plateia.')])},
+  {x:308,l:'Porta',a:()=>{if(S.ch!==0)return say([B('Agora não. O caso está lá fora.')]);if(!S.flags.phone)return say([B('Ainda não. O telefone.')]);if(!S.coat)return say([B('Lá fora chove. E eu não saio sem casaco.')]);G.startCh(1)}}]},
+street:{name:'Rua dos Valente',w:520,rain:true,
+ npcs:()=>{if(S.ch===1)return[farm(506)];if(S.ch===7&&!S.burnt){const a=[{x:S.flags.liaOut?185:300,o:P.DAVI},{x:214,o:P.VIZ},{x:236,o:{...P.VIZ,coat:'#3a4a3a',hair:'#8a8a8a'}},farm(478,.45)];if(S.flags.liaOut)a.push({x:170,o:P.LIA});return a}return[]},
+ fx:(X,cx,t,fl)=>{if(!S.fire)G.cone(X,271-cx,S.burnt?.5:fl);
+  if(S.ch===1){if(!G.has('bota')){rect(X,327-cx,146,6,2,'#5a221c');rect(X,328-cx,144,4,2,'#5a221c')}if(!G.has('jornal')){rect(X,386-cx,147,9,3,'#b8b2a0');rect(X,387-cx,148,6,1,'#6a6658')}if(!G.has('coleira'))rect(X,460-cx,141,4,2,(t>>4)%2?'#c03028':'#80201c')}},
+ over:(X,cx,t)=>{if(S.fire)G.fire(X,cx,t);if(S.burnt&&!S.fire){X.fillStyle='rgba(10,8,6,.55)';X.fillRect(0-cx,0,252,140)}},
+ hot:[
+  {x:112,l:'Porta dos Valente',when:ch(1),a:()=>go('room',292,null,{face:-1})},
+  {x:192,l:'Pichação',when:ch(1),a:()=>found('grafite',[B('“QUEM TE VÊ?”… Tinta ainda grudando no dedo. Foi feita depois do sumiço.'),B('Não é ameaça. É pergunta. Pergunta é pior: a gente leva pra casa.')])},
+  {x:256,l:'Poste',when:ch(1),a:()=>say([B('Esse poste pisca no mesmo ritmo há uma semana. Parece uma respiração. Ninguém da prefeitura veio.')])},
+  {x:330,l:'Marca no chão',when:ch(1),a:()=>found('bota',[B('Bota número 43. Terra vermelha, ainda úmida. Isso não é poeira de cidade.')])},
+  {x:390,l:'Jornal molhado',when:ch(1),a:()=>found('jornal',[B('O jornal de hoje. Circularam “família”. Não “gato”. Família.')])},
+  {x:458,l:'Sacos de lixo',when:ch(1),a:()=>found('coleira',[B('Debaixo dos sacos… uma coleira. MINGAU, 0714. Quatro números numa plaquinha de gato. Guardei.')])},
+  {x:506,l:'Homem de chapéu',when:ch(1),a:farmer}]},
+room:{name:'Casa dos Valente',w:320,
+ npcs:()=>S.ch===1?[{x:92,o:P.LIA},{x:248,o:P.HEL,face:-1}]:S.ch===3?[{x:92,o:P.LIA},{x:170,o:P.DAVI}]:[],
+ fx:(X,cx,t,fl)=>{G.glow(X,288-cx,86,90,'255,210,140',.33*fl);if(S.ch>=3){rect(X,244-cx,108,3,4,'#c8c0d8');rect(X,248-cx,107,3,4,'#e8d8a0');rect(X,252-cx,108,3,4,'#c8c0d8');rect(X,247-cx,111,6,6,'#3a5a3a')}},
+ enter:()=>{if(S.ch===1)say([B('Casa grande, silêncio caro. Repara: ninguém olha pra gente. Olham através da gente.'),['Helena','Detetive. O senhor veio pelo gato… ou por nós?']]);
+  else if(S.ch===3)say([B('A poltrona da Helena ficou com flores. As crianças não sentam nela.'),['Davi','…Você de novo.']])},
+ hot:[
+  {x:304,l:'Sair para a rua',when:ch(1),a:()=>go('street',112)},
+  {x:304,l:'Voltar à estrada velha',when:ch(3),a:()=>go('estrada',30,null,{face:1})},
+  {x:50,l:'Janela',when:ch(1),a:()=>found('janela',[B('Arranhões… do lado de fora do vidro. Gato que foge arranha por dentro.')])},
+  {x:64,l:'Tigela do gato',when:ch(1),a:()=>found('tigela',[B('Ração fresca. Disseram que ninguém toca nisso há sete dias. Alguém está mentindo — ou alguém de fora entra aqui.')])},
+  {x:92,l:'Lia, a filha',when:chs(1,3),a:lia},
+  {x:131,l:'Retrato da família',when:ch(1),a:()=>found('retrato',[B('Augusto, Helena, Davi e Lia. Rasparam os olhos dos pais. Só dos pais. Isso não é vandalismo, é escolha.')])},
+  {x:131,l:'Retrato da família',when:ch(3),a:()=>say([B('Os olhos raspados agora parecem uma previsão. Faltam duas pessoas nessa casa.')])},
+  {x:170,l:'Davi',when:ch(3),a:()=>G.openNpc('davi')},
+  {x:248,l:'Helena Valente',when:ch(1),a:()=>G.openNpc('helena')},
+  {x:252,l:'Poltrona da Helena',when:ch(3),a:()=>say([B('Flores secas. Ainda tem o cheiro dela. Eu devia ter voltado, {nome}.')])},
+  {x:288,l:'Cômoda trancada',when:ch(1),a:()=>G.has('bilhete')?say([B('Gaveta vazia agora. Só o cheiro de feno ficou.')]):G.codeLock({title:'Cômoda trancada',desc:'Cadeado de 4 números, arranhado de tanto tentarem.',code:'0714',ok:()=>found('bilhete',[B('Zero, sete, um, quatro. A plaquinha do gato abriu a gaveta da família. Dentro: feno… e um bilhete.'),['Bilhete','“Vocês só existem enquanto alguém olha.”']])})}]},
+praca:{name:'Praça da Matriz',w:480,rain:true,
+ npcs:()=>S.ch===2?[{x:240,o:P.SEB},farm(380)]:[],
+ fx:(X,cx,t,fl)=>{G.cone(X,186-cx,fl);G.cone(X,316-cx,1);for(let i=0;i<5;i++)rect(X,232+i*4-cx,104+((t/2+i*5)%22),1,2,'#7a9ab0');for(let i=0;i<8;i++)rect(X,212+((t*.5+i*8)%56)-cx,129,3,1,'#5a7a90')},
+ enter:()=>{},
+ hot:[
+  {x:94,l:'Banca de jornal',when:ch(2),a:()=>found('jornal2',[B('“Augusto Valente encontrado morto na estrada velha.” Sem violência, diz o legista. Só um homem que andou até parar.')])},
+  {x:172,l:'Cartaz no poste',when:ch(2),a:()=>found('cartaz',[B('O cartaz do Mingau. E embaixo, a lápis: “ELE ESTÁ BEM ALIMENTADO”. Alguém está brincando com a gente.')])},
+  {x:240,l:'Sebastião',when:ch(2),a:()=>{if(S.flags.qSeb)return G.openNpc('seb');S.flags.qSeb=1;run([['Sebastião','ELE TE MANDOU! SAI DAQUI!'],{qte:{from:'upright',kind:'bottle',dodge:-1,ok:'Uma garrafa passou zunindo do lado da minha orelha. Calma, Sebastião.',fail:'A garrafa estourou no meu ombro. Calma, Sebastião. Calma.'}},['Sebastião','…Você desviou. Ele nunca desvia. Você… é de verdade?']],()=>G.openNpc('seb'))}},
+  {x:336,l:'Banco da praça',when:ch(2),a:()=>found('panfleto',[B('Um panfleto molhado: verduras da Fazenda Boa Vista, parte doada ao Orfanato Santa Luzia aos domingos.'),B('Boa Vista. Guarda esse nome, {nome}.')])},
+  {x:380,l:'Vendedor de verduras',when:ch(2),a:farmer},
+  {x:451,l:'Porta da pensão',when:ch(2),a:()=>S.flags.key?go('pensao',30,null,{face:1}):say([B('Trancada. O dono disse que só o Sebastião tem a chave do quarto dele.'),B('Ganhar a chave vai exigir ganhar ele.')])}]},
+pensao:{name:'Pensão · Quarto 3',w:320,
+ fx:(X,cx,t,fl)=>{G.glow(X,160-cx,34,70,'255,230,160',.35*fl);rect(X,158-cx,30,3,4,fl>.5?'#fff3c4':'#6a6040')},
+ enter:()=>say([B('Quarto 3. As paredes são um caderno. Um homem escreveu aqui pra não se perder de si mesmo.')]),
+ hot:[
+  {x:12,l:'Voltar à praça',a:()=>go('praca',451,null,{face:-1})},
+  {x:90,l:'Parede escrita',a:()=>G.has('parede')?say([B('B-O-A-V-I-S-T-A. Ele escreveu o nome do lugar de onde fugiu.')]):G.wordPuz({title:'A parede',desc:'Entre centenas de rabiscos, oito linhas foram escritas com cuidado. Algumas letras estão em vermelho. Qual palavra elas formam?',
+   html:'<div class="wall"><em>B</em>ate na porta toda noite<br><em>O</em>lha nos olhos e sorri<br><em>A</em> voz é mansa, nunca grita<br><em>V</em>ai dizendo que a gente é sonho<br><em>I</em>nsiste até a gente concordar<br><em>S</em>ebastião, não esquece quem você é<br><em>T</em>erra vermelha na bota dele<br><em>A</em>corda. Você existe.</div>',answer:'BOAVISTA',
+   ok:()=>found('parede',[B('Boa Vista. A fazenda do panfleto. Ele escreveu o nome em pedaços, pra ninguém ler de uma vez.')])})},
+  {x:125,l:'Rádio velho',a:()=>G.has('radio')?say([B('Desliguei. Prefiro o silêncio a essa voz.')]):G.pathPuz({title:'Rádio velho',desc:'O dial está solto. Em qual estação sintonizar?',opts:['88.1','93.5','101.3'],correct:1,
+   ok:()=>found('radio',[['Rádio','…você já reparou que ninguém te olha de verdade? Que as pessoas falam com você como quem lê um papel…'],B('Uma voz calma. Gravada. Repetindo sem parar numa rádio que não existe no jornal.')]),
+   bad:()=>say([['Rádio','Chhhhhhhh…'],B('Só chiado. E por baixo, alguém respirando? Não. Só chiado.')])})},
+  {x:161,l:'Foto na parede',a:()=>found('foto',[B('Peões da Boa Vista, 1971. O homem de chapéu no centro teve o rosto raspado com unha.'),B('No verso, a lápis: “Rádio da fazenda, 93.5”.')])},
+  {x:230,l:'Cama',a:()=>say([B('Lençol esticado demais. Quem tem medo arruma a cama pra provar que ainda manda em alguma coisa.')])},
+  {x:272,l:'Botas debaixo da cama',a:()=>found('botas2',[B('Terra vermelha seca. Sebastião também andou na Boa Vista. Ele não é suspeito, {nome}: é sobrevivente.')])}]},
+estrada:{name:'Estrada Velha',w:560,
+ npcs:()=>S.ch===3?[farm(530,.3)]:[],
+ fx:(X,cx,t)=>{if(!G.has('lanterna'))G.glow(X,360-cx,146,24,'255,230,150',.35);rect(X,357-cx,144,6,3,'#3a3a3a');
+  for(const[a,b]of[[256,160],[262,159],[268,161],[274,160],[280,159],[286,161],[292,160]]){rect(X,a-cx,b,4,1,'#9a5a3a');rect(X,a+1-cx,b-2,1,3,'#9a5a3a')}
+  if(!G.has('gravador')&&(t>>5)%2)rect(X,452-cx,118,2,1,'#e8d9a0')},
+ hot:[
+  {x:10,l:'Voltar para a cidade',when:ch(3),a:()=>go('room',290,null,{face:-1})},
+  {x:142,l:'Cerca de arame',when:ch(3),a:()=>found('palha',[B('Fios de palha trançada presos no arame. Palha de chapéu. Alguém ficou parado aqui, encostado, olhando.')])},
+  {x:205,l:'Marcas na terra',when:ch(3),a:()=>found('carroca',[B('Rodas finas. Carroça. Ida e volta. Ninguém mais anda de carroça na cidade, {nome}.')])},
+  {x:274,l:'Inscrição no chão',when:ch(3),a:()=>found('inscricao',[B('“EU NUNCA EXISTI.” Escrito com graveto.'),B('As letras são retas, calmas. Um homem desesperado não escreve assim. A mesma mão do bilhete da gaveta.')])},
+  {x:360,l:'Lanterna caída',when:ch(3),a:()=>found('lanterna',[B('A lanterna do Augusto. Ainda acende. Ele não estava fugindo. Estava procurando alguém.')])},
+  {x:452,l:'Brilho no milharal',when:ch(3),a:()=>G.has('gravador')?say([B('A fita ainda está no bolso. Pesa como uma confissão.')]):G.orderPuz({title:'Gravador no milharal',desc:'A fita se partiu em quatro trechos. Monte na ordem em que a conversa aconteceu.',
+   items:['Augusto… você já reparou que ninguém te olha nos olhos?','Sua mulher fala com você como quem lê um papel.','Talvez vocês sejam só uma história que alguém está contando.','E histórias acabam, Augusto. Venha até a estrada ver.'],
+   ok:()=>found('gravador',[['Fita','“…E histórias acabam, Augusto. Venha até a estrada ver.”'],B('Ninguém empurrou o Augusto. Ele veio andando. Convencido.')])})},
+  {x:530,l:'Vulto no milharal',when:ch(3),a:()=>{farmer();S.flags.vulto=1}}]},
+orfanato:{name:'Orfanato Santa Luzia',w:480,
+ npcs:()=>S.ch===4?[{x:230,o:P.CLARA},farm(338)]:S.ch===5?[{x:230,o:P.CLARA}]:[],
+ fx:(X,cx,t,fl)=>{for(const[x,y]of[[148,96],[308,56],[348,96]])G.glow(X,x+8-cx,y,14,'255,220,150',.25*fl);
+  const sw=Math.sin(t/25)*6;G.line(X,440-cx,90,440+sw-cx,124,'#5a5a5a');G.line(X,456-cx,90,456+sw-cx,124,'#5a5a5a');rect(X,438+sw-cx,124,20,2,'#5a3a22');
+  if(S.ch===4&&!G.has('fita'))rect(X,456+sw-cx,108,2,3,'#c03028');
+  const w='#e8e4dc';rect(X,96-cx,118,10,4,w);rect(X,104-cx,114,4,4,w);rect(X,104-cx,113,1,1,w);rect(X,107-cx,113,1,1,w);rect(X,94-cx,114,1,4,w);rect(X,98-cx,108,12,1,w);rect(X,101-cx,106,6,2,w);G.line(X,112-cx,120,118-cx,120,w);rect(X,116-cx,119,1,3,w)},
+ enter:()=>{if(S.ch===5)say([B('O pátio vazio. As crianças estão na enfermaria. A cozinha fica pela porta principal.')])},
+ hot:[
+  {x:230,l:'Irmã Clara',when:ch(4),a:()=>G.openNpc('clara')},
+  {x:230,l:'Irmã Clara',when:ch(5),a:()=>say([['Irmã Clara','Vá à cozinha, detetive. Dona Rosa está desesperada.']])},
+  {x:106,l:'Desenho no muro',when:ch(4),a:()=>found('giz',[B('Giz branco: um gato, um chapéu de palha e uma seta apontando pros fundos.'),B('Criança desenha o que quer que alguém veja.')])},
+  {x:448,l:'Balanço',when:ch(4),a:()=>found('fita',[B('Uma fita vermelha presa na corrente. Ela saiu brincando, {nome}. Não fugindo.')])},
+  {x:305,l:'Caixotes',when:ch(4),a:()=>found('caixas',[B('“FAZENDA BOA VISTA — DOAÇÃO DE DOMINGO.” Domingo. O dia em que ela sumiu.')])},
+  {x:338,l:'Entregador',when:ch(4),a:farmer},
+  {x:261,l:'Porta principal',when:ch(4),a:()=>say([B('As irmãs pediram pra eu não assustar as crianças lá dentro. O que eu procuro está aqui fora.')])},
+  {x:261,l:'Porta da cozinha',when:ch(5),a:()=>go('cozinha',22,null,{face:1})},
+  {x:474,l:'Portão dos fundos',when:ch(4),a:()=>G.has('giz')?go('bosque',14,null,{face:1}):say([B('Os fundos dão pro bosque. Ainda não tenho motivo pra entrar ali.')])}]},
+bosque:{name:'Bosque',w:560,zones:[{id:'qBranch',x:300,when:ch(4),a:()=>run([B('…Ouviu isso? Lá em cima.'),{qte:{from:'up',kind:'branch',dodge:1,ok:'Um galho podre, do tamanho de um homem. Esse bosque não quer visita.',fail:'O galho me pegou de raspão. Tô bem. Acho.'}}])}],
+ npcs:()=>S.ch===4&&S.flags.path&&!S.flags.ninaOk?[{x:532,o:P.NINA,face:-1}]:[],
+ fx:(X,cx,t)=>{G.blades(X,511-cx,62,16,t/90,'#3a3430');for(let i=0;i<8;i++){const fx=(i*73+t*.2)%560-cx,fy=90+Math.sin(t/40+i)*20;if((t+i*9)%60<40)rect(X,fx,fy,1,1,'#c8d070')}
+  for(const[id,x]of[['mapa1',120],['mapa2',250],['mapa3',366]])if(!G.has(id))rect(X,x-cx,146,4,3,'#d8d0b8')},
+ over:(X,cx,t)=>{for(let i=0;i<4;i++){X.fillStyle='rgba(180,190,190,.07)';X.fillRect(((t*.15*(i+1))%640)-200-cx*.5,96+i*12,320,10)}},
+ enter:()=>say([B('Bosque. A neblina apaga o caminho a três passos. Se a Nina deixou rastro, foi de criança: no chão.')]),
+ hot:[
+  {x:8,l:'Voltar ao pátio',a:()=>go('orfanato',470,null,{face:-1})},
+  {x:120,l:'Papel no chão',when:()=>!G.has('mapa1'),a:()=>found('mapa1',[B('Pedaço de um mapa desenhado a giz de cera. Uma árvore torta com “NÃO” escrito em cima.')])},
+  {x:250,l:'Papel na raiz',when:()=>!G.has('mapa2'),a:()=>found('mapa2',[B('Outro pedaço: um rio riscado com um X enorme.')])},
+  {x:366,l:'Papel no galho',when:()=>!G.has('mapa3'),a:()=>found('mapa3',[B('O último: um moinho, um gato em cima e um coração. Ela sabia pra onde ia.')])},
+  {x:430,l:'Bifurcação',when:()=>!S.flags.path,a:()=>{const all=['mapa1','mapa2','mapa3'].every(G.has);
+   G.pathPuz({title:'Bifurcação',desc:all?'Três trilhas somem na neblina. O mapa da Nina está inteiro no seu bolso.':'Três trilhas. Sem o mapa inteiro, é chute — e chute custa tempo.',opts:['Pela árvore torta','Pela beira do rio','Pela trilha do moinho'],correct:2,
+    ok:()=>{S.flags.path=1;say([B('O moinho. Gira sem vento. Tem uma silhueta pequena lá embaixo.')])},
+    bad:()=>{S.wrong++;G.addDay(1);say([B('A trilha dá voltas e me devolve pro mesmo lugar. Perdi a noite inteira.'),['Caderno',`Dia ${S.day} de 30.`]])}})}},
+  {x:532,l:'Nina',when:()=>S.flags.path&&!S.flags.ninaOk,a:()=>{found('nina',[['Nina','Oi, moço. Você também veio ver o gato?'],B('Nina. Tá tudo bem. Você tá com frio?'),['Nina','O moço do chapéu disse que o gato branco ia me esperar aqui. Mas ele não veio.'],['Nina','Ele disse que eu não existo. Que eu sou desenho. Eu ri.'],['Nina','Eu sei que eu sou de verdade. Criança sabe.'],B('Ela tem uma boneca de palha no colo. Trançada igual a um chapéu. Vamos pra casa, Nina.')],()=>{S.flags.ninaOk=1})}}]},
+cozinha:{name:'Cozinha do orfanato',w:320,
+ npcs:()=>S.ch===5?[{x:150,o:P.ROSA}]:[],
+ fx:(X,cx,t,fl)=>{G.glow(X,160-cx,40,90,'255,240,200',.22*fl);for(let i=0;i<3;i++)rect(X,150+i*5-cx,100-((t/3+i*7)%14),1,2,'rgba(220,220,220,.5)');
+  if(S.ch===5){X.globalAlpha=.6;rect(X,126-cx,40,8,8,'#9a7a5a');rect(X,123-cx,38,14,2,'#a88a48');rect(X,126-cx,36,8,2,'#a88a48');X.globalAlpha=1}},
+ hot:[
+  {x:10,l:'Voltar ao pátio',a:()=>go('orfanato',261,null,{face:1})},
+  {x:120,l:'Janela',when:ch(5),a:()=>{say([['Homem de chapéu','…'],B('Um rosto na janela, de chapéu. Pisquei e sumiu. Só ficou o vapor da sopa no vidro.')])}},
+  {x:150,l:'Dona Rosa',when:ch(5),a:()=>G.openNpc('rosa')},
+  {x:197,l:'Caderno sobre a mesa',when:ch(5),a:()=>found('ledger',[B('Caderno de entregas. Primeira entrega da Boa Vista: 13 de novembro. Assinado só com um J.'),B('Treze, onze. Dia e mês.')])},
+  {x:233,l:'Caixotes',when:ch(5),a:()=>found('carimbo',[B('Carimbo de colheita: 13/11. A noite em que o Mingau sumiu.')])},
+  {x:270,l:'Despensa',when:ch(5),a:()=>found('podre',[B('Repolhos perfeitos por fora. Abro um: preto por dentro.'),B('Não é veneno, {nome}. É tempo. Alguém deixou apodrecer de propósito, bonito por fora.')])},
+  {x:302,l:'Armário trancado',when:ch(5),a:()=>G.has('caderno')?say([B('Vazio. Só o cheiro de terra.')]):G.codeLock({title:'Armário do seu Joaquim',desc:'Cadeado de 4 números. Riscado na madeira: “dia e mês”.',code:'1311',
+   ok:()=>found('caderno',[B('Dentro: terra vermelha em vidros… e um caderno.'),['Caderno de conversas','Augusto ✓. Helena ✓. Sebastião ✗ (fugiu). Rosa —.'],['Caderno de conversas','Brandão: ?'],['Caderno de conversas','E na última linha, a letra tremida: “quem está olhando”.']])})}]},
+fazenda:{name:'Fazenda Boa Vista',w:560,zones:[{id:'qDog',x:420,when:ch(6),a:()=>run([['Caderno','Um rosnado, vindo do escuro do celeiro.'],{qte:{from:'right',kind:'dog',dodge:-1,ok:'Um cão de guarda. Passou reto e sumiu atrás do poço. Alguém soltou ele de propósito.',fail:'O cão me derrubou e sumiu no escuro. Alguém soltou ele de propósito.'}}])}],
+ fx:(X,cx,t,fl)=>{G.blades(X,100-cx,48,22,t/60,'#5a5a5a');if((t>>6)%3)G.glow(X,208-cx,93,18,'255,210,120',.3);
+  if(!S.flags.scare){const sx=330-cx;rect(X,sx,96,2,44,'#4a3a26');rect(X,sx-12,104,26,2,'#4a3a26');rect(X,sx-5,104,12,16,'#6a3a2a');rect(X,sx-3,96,8,8,'#b8a070');rect(X,sx-6,95,14,1,'#a88a48');rect(X,sx-3,92,8,3,'#a88a48');rect(X,sx-1,99,1,1,'#111');rect(X,sx+2,99,1,1,'#111')}
+  else{rect(X,330-cx,104,2,36,'#4a3a26');rect(X,318-cx,108,26,2,'#4a3a26')}
+  if(S.ch===6&&S.flags.smoke){X.fillStyle='rgba(255,120,40,.18)';X.fillRect(0,60,40,40)}},
+ enter:()=>{},
+ hot:[
+  {x:36,l:'Porteira',when:ch(6),a:()=>found('placa',[B('“Fazenda Boa Vista — desde 1931.” Quase cem anos de gente conversando aqui dentro.')])},
+  {x:100,l:'Moinho',a:()=>say([B('O moinho gira. Não tem vento. Eu molho o dedo e levanto: nada.')])},
+  {x:238,l:'Casa da fazenda',a:()=>say([B('Trancada, luz quase apagada. Na varanda, uma cadeira de balanço ainda balança.'),B('Ele não está em casa. Ou quer que eu pense isso.')])},
+  {x:330,l:'Espantalho',when:()=>!S.flags.scare,a:()=>{S.flags.scare=1;say([B('Um espantalho com chapéu de palha novinho. Os outros espantalhos da estrada não têm chapéu.'),B('Por um segundo achei que ele piscou.'),['Caderno','Quando Brandão vira as costas, alguma coisa range.']])}},
+  {x:330,l:'Onde estava o espantalho',when:()=>!!S.flags.scare,a:()=>say([B('Só a cruz de madeira. E pegadas de bota 43, frescas, indo pro celeiro.'),B('Ele esteve aqui o tempo todo, {nome}. Do nosso lado.')])},
+  {x:390,l:'Carroça',when:ch(6),a:()=>found('roda',[B('As rodas batem com as marcas da estrada velha. Terra vermelha seca nos raios.')])},
+  {x:441,l:'Poço',a:()=>say([B('Fundo. Escuro. Ouço um miado lá embaixo? Não. É o vento. Tomara que seja o vento.')])},
+  {x:512,l:'Celeiro',when:ch(6),a:()=>S.flags.barn?go('celeiro',300,null,{face:-1}):G.codeLock({title:'Celeiro',desc:'Cadeado novo, de 4 números. Gravado no metal: “o ano em que tudo começou”.',code:'1931',ok:()=>{S.flags.barn=1;go('celeiro',300,null,{face:-1})}})}]},
+celeiro:{name:'Celeiro',w:320,zones:[{id:'qFork',x:230,a:()=>run([B('Tem alguma coisa presa no alto, na viga…'),{qte:{from:'up',kind:'fork',dodge:1,ok:'Um forcado, amarrado pra cair em quem entrasse. Uma armadilha. Ele esperava visita.',fail:'O cabo do forcado me acertou. Uma armadilha. Ele esperava visita.'}}])}],
+ fx:(X,cx,t,fl)=>{G.glow(X,160-cx,26,80,'255,210,130',.32*fl);rect(X,157-cx,22,6,6,'#3a3a3a');rect(X,158-cx,23,4,4,fl>.5?'#ffd27a':'#8a6a30');
+  for(const[x,y]of[[236,52],[252,66],[270,48],[284,72]])rect(X,x-cx,y,2,2,'#b23a2e');rect(X,297-cx,44,2,2,(t>>4)%2?'#ff5040':'#b23a2e')},
+ enter:()=>say([B('O celeiro. Cheira a feno, tinta e uma coisa que eu não sei nomear. Paciência, talvez.')]),
+ hot:[
+  {x:308,l:'Sair',a:()=>go('fazenda',512,null,{face:-1})},
+  {x:35,l:'Fardos de feno',a:()=>say([B('Feno. O mesmo do bilhete na gaveta dos Valente.')])},
+  {x:100,l:'Bancada',a:()=>found('ferramentas',[B('Uma máquina de escrever. O “a” sai torto, igual ao do bilhete.'),B('Latas de tinta vermelha e preta: as cores da pichação. E um gravador, com fitas etiquetadas: AUGUSTO. HELENA. SEBASTIÃO.')])},
+  {x:177,l:'Gaiola',a:()=>found('gaiola',[B('Gaiola aberta. Pelo branco nas grades. Uma tigela limpa, ração fresca.'),B('O Mingau esteve aqui. Bem cuidado. “Bem alimentado”, como dizia o cartaz.')])},
+  {x:205,l:'Botas',a:()=>found('bota43',[B('Botas 43, terra vermelha. Iguais à pegada da rua dos Valente. O mesmo homem, em todas as cenas.')])},
+  {x:258,l:'Mapa na parede',a:()=>found('mapa',[B('Mapa da cidade com alfinetes vermelhos: casa Valente, pensão, orfanato… delegacia.'),B('E um alfinete fora do papel, espetado na moldura. Etiqueta: “quem joga”.'),B('{nome}… ele sabe de você.')])}]},
+casaj:{name:'Casa da fazenda',w:440,
+ fx:(X,cx,t,fl)=>{G.glow(X,375-cx,98,70,'255,210,140',.3*fl);for(let i=0;i<30;i++)rect(X,394+Math.random()*28-cx,116+Math.random()*20,1,1,Math.random()<.5?'#c8e0d8':'#5a7a70');G.glow(X,408-cx,126,40,'160,220,210',.18);
+  if(S.flags.hatOff){rect(X,229-cx,62,14,1,'#a88a48');rect(X,233-cx,58,6,4,'#a88a48')}
+  if(S.sit){G.sit(X,346-cx,128,P.FARMNH,S.front);if(S.catLap)G.cat(X,347-cx,125,1)}}}};
+
+function lia(){const L=S.ch===1?['Mamãe diz que a gente é desenho. Eu acho que a gente é sonho de alguém.','O moço do chapéu deu leite pro Mingau. Ele é legal. Ele sabe o seu nome.','Você tá sendo olhado também, sabia?']
+ :['A mamãe virou céu. O Davi disse que é mentira, mas o céu tá mais bonito.','O moço do chapéu passou na janela ontem. Perguntou de você, detetive.','Eu sei que eu existo. Eu belisquei. Doeu.'];
+ const i=S.flags['lia'+S.ch]=(S.flags['lia'+S.ch]||0)+1;say([['Lia',L[Math.min(i-1,L.length-1)].replace('o seu nome',S.facts.nome?'o nome de '+S.facts.nome:'o seu nome')]])}
+
+/* ---------- capítulos ---------- */
+G.CH=[
+{title:'Prólogo · A voz na cabeça',day:1,brief:'Prólogo na delegacia, antes do caso dos Valente.',hint:'Atenda o telefone e vista o casaco antes de sair.',
+ idle:['O telefone, {nome}. Ele não vai parar sozinho.','Meu casaco tá no cabide. Lá fora chove.'],
+ intro:[{go:'office',x:150,face:1},()=>{S.actor='DETNC';S.coat=false;S.flags.ring=1},
+  ['Narrador','Vila Serena. Novembro. Chove fino desde que um gato sumiu.'],
+  ['Narrador','Nesta cidade ninguém tranca a porta. Mas, há uma semana, as pessoas começaram a trancar outra coisa: a certeza de que existem.'],
+  B('Otávio Brandão. Detetive. Vinte e dois anos de casos, um casaco velho e o costume de conversar sozinho.'),
+  B('Só que agora eu não falo sozinho. Falo com você.'),
+  B('Você vai ser a voz na minha cabeça. Escreve o que você enxerga no botão Pensar. Eu enxergo o resto.'),
+  B('E presta atenção: eu converso muito. Às vezes eu pergunto de você também. Faz parte.'),
+  B('O telefone está tocando. Chega perto e examina.')],qs:null},
+{title:'Caso 1 · O gato dos Valente',day:1,brief:'Caso Valente, parte 1: o gato Mingau sumiu há 7 dias; a família (pai Augusto, mãe Helena, filhos Davi e Lia) passou a agir como se não fosse real. Investigando a rua e a sala da casa.',
+ hint:'Examine a rua e a casa, converse com Helena e abra a cômoda. Depois, Teoria.',
+ idle:['A Helena não vai falar com um estranho. Conversa com ela com paciência.','Quatro números numa coleira. Quatro números num cadeado. Pensa nisso.','O homem de chapéu perto do lixo… você reparou nele?'],
+ intro:[{go:'street',x:520,face:-1},()=>{S.actor='DET';S.coat=true},{walk:350},
+  B('Rua dos Valente. O poste pisca como se a rua estivesse respirando.'),
+  B('A casa da pichação. Família de dinheiro, de nome, de missa no domingo. E de repente, quatro pessoas que não acreditam que existem.'),
+  B('Ande, examine tudo, escreva o que pensa. Se a pista for errada, a gente perde tempo. E tempo é o que essa família não tem.')],
+ qs:[{q:'Como o Mingau saiu da casa?',o:['Fugiu pela porta da frente','Foi tirado pela janela, por alguém de fora','Nunca saiu, está escondido na casa'],a:1,need:['janela','coleira']},
+  {q:'Quem continua indo até a casa?',o:['Augusto, o pai, à noite','Ninguém — a ração é velha','Alguém que vem do campo'],a:2,need:['tigela','bota']},
+  {q:'Como convenceram os pais de que não existem?',o:['Com remédios na comida','Com palavras: bilhetes, pichação e conversa','Com ameaças por telefone'],a:1,need:['bilhete','grafite','helena']}],
+ outro:[B('Alguém do campo. Um homem que conversa até a pessoa acreditar. Ele não roubou um gato. Roubou a certeza deles.'),
+  {card:'Dia 3 · 03h12',ms:2600},{go:'office',x:150,face:1},['Telefone','Trrrim.'],
+  ['Delegado Paiva','Brandão. Augusto Valente. Encontraram na estrada velha, perto das fazendas.'],
+  {slow:4200,word:'EU NUNCA EXISTI'},['Delegado Paiva','Ao lado dele, escrito na terra: “EU NUNCA EXISTI”.'],
+  B('{nome}… você ainda tá aí? Isso agora é morte. E ainda tem duas crianças naquela casa.')]},
+{title:'Caso 2 · O homem que gritava',day:4,brief:'Caso 2: Sebastião grita na praça que a cidade é de papel. Augusto Valente foi achado morto na estrada velha com "EU NUNCA EXISTI" escrito na terra.',
+ hint:'Ganhe a confiança de Sebastião. Ele tem a chave do quarto na pensão.',
+ idle:['Ele grita pra cima, {nome}. Como se alguém estivesse olhando de lá.','Ninguém conta nada pra quem chama de louco.','A pensão fica à direita da praça.'],
+ intro:[{go:'office',x:170,face:1},()=>{S.flags.paiva=1},
+  ['Delegado Paiva','Brandão. “Parada cardíaca na estrada”, diz o legista sobre o Valente. Eu digo que é bom não falar em assassinato ainda.'],
+  B('Ele andou até a estrada no meio da noite pra morrer acreditando que nunca existiu, delegado.'),
+  ['Delegado Paiva','E agora tem um maluco na praça gritando a mesma coisa. Terceira noite. O povo está com medo. Resolve.'],
+  B('Maluco não, delegado. Talvez a única pessoa que escapou.'),
+  ()=>{S.flags.paiva=0},{go:'praca',x:20,face:1},{walk:150},
+  ['Sebastião','A CIDADE É DE PAPEL! VOCÊS SÃO LIDOS! ALGUÉM TÁ LENDO A GENTE AGORA!'],
+  B('{nome}, repara: ele não grita pra praça. Grita pra cima. Pra fora.')],
+ qs:[{q:'Sebastião é perigoso?',o:['Sim: ele matou Augusto','Não: é outra vítima, que resistiu','Ele inventa tudo'],a:1,need:['seb','botas2']},
+  {q:'Onde tudo começou?',o:['No Bar do Tonho','Na Fazenda Boa Vista','Na delegacia'],a:1,need:['parede','foto']},
+  {q:'O que liga a fazenda à cidade?',o:['Entregas de verdura','Cartas anônimas pelo correio','A rádio da prefeitura'],a:0,need:['panfleto']}],
+ outro:[B('Sebastião não é perigoso. É testemunha. A Boa Vista é o começo, e as verduras são o caminho até a cidade.'),
+  ['Narrador','Naquela noite, uma ambulância leva Sebastião para o sanatório. Ele vai quieto.'],
+  ['Sebastião','Detetive. Não deixa ele conversar com você. Ele fala até a gente concordar.'],
+  {card:'Dia 7 · 02h40',ms:2400},{go:'office',x:150},['Telefone','Trrrim.'],
+  {slow:4200,word:'HELENA'},['Delegado Paiva','Brandão… Helena Valente. A empregada encontrou no jardim. Sentada, olhando pro céu. Nenhuma marca.'],
+  B('…'),B('Ela me disse que se sentia um desenho. Eu devia ter voltado lá, {nome}.'),
+  B('Amanhã a gente vai até a estrada velha, onde acharam o Augusto. Dessa vez eu não chego atrasado.')]},
+{title:'Caso 1 · A estrada velha',day:8,brief:'Caso Valente, parte 2: Helena também morreu, sem marcas. Investigando a estrada velha onde Augusto morreu e conversando com o filho Davi, 12 anos.',
+ hint:'Examine a estrada. Depois converse com Davi na casa dos Valente (saída à esquerda).',
+ idle:['Quem escreve “eu nunca existi” com letra tão calma?','O Davi viu coisa. Criança vê tudo.','Tem um brilho no milharal, mais pra direita.'],
+ intro:[{go:'estrada',x:20,face:1},{walk:110},
+  B('Estrada velha. Terra vermelha até onde a lua alcança.'),
+  B('Foi aqui que o Augusto parou. Sem briga, sem ferida. Só ele, a noite e uma frase escrita no chão.'),
+  B('Depois a gente volta pra casa dos Valente. As crianças estão sozinhas com uma tia que dorme o dia inteiro.')],
+ qs:[{q:'Como Augusto morreu?',o:['Foi atacado na estrada','Andou até ali convencido, e alguém escreveu a frase depois','Caiu da carroça'],a:1,need:['inscricao','gravador']},
+  {q:'Quem gravou a fita?',o:['Sebastião','Um homem calmo que visita à noite: Joaquim','Helena'],a:1,need:['gravador','davi']},
+  {q:'Como ele chega até a casa?',o:['De carroça, pela estrada velha','No carro da prefeitura','A pé, pela praça'],a:0,need:['carroca','palha']}],
+ outro:[B('Augusto andou até a estrada convencido. Alguém escreveu a frase depois, com letra calma. Joaquim, de carroça, pela estrada velha.'),
+  {card:'Dia 12',ms:2000},{go:'office',x:150},()=>{S.flags.paiva=1},
+  ['Delegado Paiva','Joaquim da Boa Vista? Brandão, o homem doa verdura pro orfanato há quarenta anos. Sem prova, ninguém entra naquela fazenda.'],
+  B('Uma fita, uma carroça e duas crianças órfãs não são prova?'),
+  ['Delegado Paiva','São histórias. E história não entra em tribunal.'],['Telefone','Trrrim.'],
+  ['Delegado Paiva','…Sim. Entendi. Brandão: Orfanato Santa Luzia. Uma menina sumiu. Nina, sete anos.'],()=>{S.flags.paiva=0},
+  B('O orfanato que recebe verdura da Boa Vista. {nome}, tudo está ligado. Tudo.')]},
+{title:'Caso 3 · A menina que seguiu o gato',day:13,brief:'Caso 3: Nina, 7 anos, sumiu do Orfanato Santa Luzia depois da entrega de verduras de domingo.',
+ hint:'Converse com a Irmã Clara e ache a pista que leva aos fundos.',
+ idle:['Criança desenha o que quer que alguém veja. Olha os muros.','No bosque, procura papel no chão.','Três pedaços de mapa, {nome}. Ela deixou rastro.'],
+ intro:[{go:'orfanato',x:20,face:1},{walk:170},
+  ['Irmã Clara','Detetive. Ela sumiu depois do almoço de domingo. Não levou casaco, não levou nada.'],
+  B('Domingo. Dia da entrega de verdura.'),
+  B('{nome}, aqui a pressa mata. Conversa com a irmã com cuidado. E olha o pátio inteiro.')],
+ qs:[{q:'Por que Nina foi pro bosque?',o:['Fugiu de um castigo','Seguiu a história do gato que o moço contou','Foi levada à força'],a:1,need:['giz','clara']},
+  {q:'Por que as crianças não acreditam que não existem?',o:['São novas demais pra entender','Elas já sabem que a imaginação também é de verdade','Ninguém tentou convencê-las'],a:1,need:['nina']},
+  {q:'O que o moço leva ao orfanato?',o:['Brinquedos','Verduras e histórias aos domingos','Dinheiro'],a:1,need:['caixas','clara']}],
+ outro:[B('Nina seguiu uma história. E as crianças não caem nessa porque sabem que imaginação também é de verdade. Com elas, ele não consegue.'),
+  ['Irmã Clara','Obrigada, detetive. Que Deus o guarde. E que guarde o senhor de quem conta histórias demais.'],
+  {card:'Dia 18',ms:2000},{go:'office',x:150},['Telefone','Trrrim.'],
+  ['Irmã Clara','Detetive? As crianças… estão todas passando mal. Todas tomaram a sopa de domingo.'],B('Estou indo, irmã.')]},
+{title:'Caso 4 · A sopa do orfanato',day:18,brief:'Caso 4: as crianças do orfanato passaram mal com a sopa de domingo; investigando a cozinha e a cozinheira Dona Rosa.',
+ hint:'Converse com Dona Rosa e descubra o código do armário.',
+ idle:['“Dia e mês”, riscado na madeira. Que data importa aqui?','A Rosa fala muito quando está à vontade. Deixa ela à vontade.','Verdura bonita por fora… abre uma.'],
+ intro:[{go:'cozinha',x:20,face:1},{walk:100},
+  ['Dona Rosa','Polícia na minha cozinha… meu Deus do céu.'],
+  B('Ninguém morreu, {nome}. Ainda. Mas alguém quer que essa cozinha pareça culpada.')],
+ qs:[{q:'Foi envenenamento?',o:['Sim, puseram veneno na sopa','Não: verdura guardada de propósito, bonita por fora e podre por dentro','A Rosa errou a receita'],a:1,need:['podre','rosa']},
+  {q:'Quem está na lista do caderno?',o:['Só os Valente','Todos com quem ele conversou, inclusive Brandão','Só as crianças'],a:1,need:['caderno']},
+  {q:'De onde vem tudo isso?',o:['Da pensão','Da Fazenda Boa Vista','Da delegacia'],a:1,need:['carimbo','ledger']}],
+ outro:[B('Não foi veneno. Foi tempo: verdura guardada de propósito, bonita por fora, podre por dentro. Igual às conversas dele.'),
+  {slow:3800,word:'BRANDÃO ?'},B('E no caderno… o meu nome. Brandão, com um ponto de interrogação.'),B('E a última linha: “quem está olhando”.'),B('{nome}. Isso é você?'),{wait:1500},
+  B('Não responde. Amanhã a gente vai até a Boa Vista. Sem mandado. Sem delegado. Só nós dois.')]},
+{title:'Caso 1 · Fazenda Boa Vista',day:22,brief:'Caso Valente, parte 3: na Fazenda Boa Vista, sem mandado, procurando provas contra Joaquim, o fazendeiro que conversa até as pessoas acreditarem que não existem.',
+ hint:'Examine a fazenda e descubra o código do celeiro.',
+ idle:['“O ano em que tudo começou.” Olha a porteira.','Aquele espantalho… não gosto dele.','Fala baixo comigo. Aqui até as paredes escutam.'],
+ intro:[{go:'fazenda',x:20,face:1},{walk:70},
+  B('Fazenda Boa Vista. O moinho gira e não tem vento.'),
+  B('Fala baixo comigo, {nome}. Aqui, até as paredes escutam.')],
+ qs:[{q:'Quem é o homem que conversa?',o:['Sebastião','Joaquim, dono da Boa Vista','O delegado Paiva'],a:1,need:['ferramentas','bota43']},
+  {q:'Como ele mata?',o:['Com as próprias mãos','Não toca em ninguém: convence, e a pessoa faz o resto','Com veneno'],a:1,need:['ferramentas','mapa']},
+  {q:'Onde está o Mingau?',o:['Morto, no poço','Com ele, bem cuidado','De volta à casa dos Valente'],a:1,need:['gaiola']}],
+ outro:[B('Joaquim. Ele nunca tocou em ninguém. Conversa, deixa um bilhete, pinta uma pergunta, e a pessoa faz o resto.'),
+  B('E o Mingau está com ele. Bem alimentado. Como dizia o cartaz.'),
+  {go:'fazenda',x:470,face:-1},()=>{S.flags.smoke=1},{slow:3000,word:'FUMAÇA'},B('…Fumaça. Lá longe, pros lados da cidade.'),B('Rua dos Valente. As crianças!')]},
+{title:'Noite 27 · Fogo',day:27,music:'tense',brief:'Clímax: a casa dos Valente pega fogo com Lia lá dentro.',
+ intro:[()=>{S.fire=true},{go:'street',x:440,face:-1},{walk:330,spd:1},
+  ['Davi','DETETIVE! A Lia tá lá dentro! Ela disse que ia ver se a casa era de verdade!'],
+  ['Vizinho','Os bombeiros ainda tão longe! O telhado vai cair!'],
+  {qte:{from:'up',kind:'fire',dodge:-1,ok:'Uma viga em chamas caiu onde eu estava.',fail:'A viga em chamas raspou meu braço. Eu ainda consigo andar.'}},B('{nome}. Agora não é pra pensar. É pra decidir.'),{slow:3600,word:'DECIDA'},{card:'',ms:3500},
+  {choice:'O que Brandão faz?',opts:['Entrar na casa e salvar Lia','Aceitar: o que aconteceu, aconteceu. Deixar ir.'],then:i=>G.ending(i)}],qs:null}];
+
+/* ---------- finais ---------- */
+G.ending=i=>{G.A&&G.A.music('none');if(i===0)run([()=>{S.ending='salvar'},B('Cuida da porta, Davi. Eu volto.'),{walk:112,spd:1},()=>{S.hideP=true},
+  {card:'O fogo não faz barulho de filme.\nFaz barulho de casa velha desistindo.',ms:4500},
+  ()=>{S.hideP=false;S.p.x=150;S.flags.liaOut=1},{wait:700},
+  ['Narrador','Ele sai pela porta com Lia nos braços. Coloca a menina ao lado do irmão.'],
+  B('Ela existe, {nome}. Eu senti o peso.'),{slow:5000},()=>{S.actor='down'},{wait:3000},
+  {card:'',ms:3500},()=>{S.fire=false;S.burnt=true;S.hideP=true;S.flags.liaOut=0;G.aside('','');G.A&&G.A.music('sad')},
+  {go:'praca',x:240},{wait:3200},{go:'orfanato',x:240},{wait:3200},
+  {paper:'DETETIVE MORRE AO SALVAR MENINA EM INCÊNDIO',sub:'Otávio Brandão, matrícula 0451, entrou na casa em chamas da família Valente e retirou Lia Valente, 6 anos, com vida. O detetive não resistiu à fumaça. Davi Valente, 12, disse apenas: “ele acreditou na gente”. Os irmãos foram acolhidos pelo Orfanato Santa Luzia.'},
+  ['Narrador','Dizem que ele foi um herói. Heróis são histórias que uma cidade conta pra conseguir dormir.'],
+  ['Narrador','O delegado Paiva arquivou o caso dos Valente como “fatalidades”. Ninguém foi até a Boa Vista.']],G.epilogue);
+ else run([()=>{S.ending='deixar'},B('…'),{wait:2500},B('O que aconteceu, aconteceu. Eu não posso salvar todo mundo de uma história que não é minha.'),['Davi','LIA!'],
+  {card:'Os bombeiros chegam às 23h31.\nO teto cede às 23h40.',ms:4500},()=>{S.fire=false;S.burnt=true;S.hideP=true;G.aside('','');G.A&&G.A.music('sad')},{card:'',ms:3000},
+  {go:'praca',x:240},{wait:3200},{go:'orfanato',x:240},{wait:3200},
+  {paper:'INCÊNDIO DESTRÓI CASA DOS VALENTE — NENHUM CORPO ENCONTRADO',sub:'Bombeiros vasculharam os escombros por dois dias. Nenhum sinal de Lia Valente, 6 anos. O irmão, Davi, afirma que ela “está bem, num lugar onde alguém olha por ela”. O detetive Otávio Brandão, que assistiu ao incêndio da calçada, pediu afastamento.'},
+  ['Narrador','Dizem que ele foi covarde. Outros, que foi sensato. Depende de quem conta a história.'],
+  ['Narrador','Talvez a menina nunca tenha estado lá dentro. Talvez nunca tenha estado em lugar nenhum.']],G.epilogue)};
+G.epilogue=()=>run([()=>{G.A&&G.A.music('box');S.actor='FARM';S.hideP=false;S.burnt=true},{go:'street',x:515,face:-1},{walk:360},
+ ['Narrador','Uma pessoa acredita no que vê. Acredita mais no que escuta. E acredita de vez no que faz sentido.'],{walk:200},
+ ['Narrador','Não precisa de faca. Não precisa de veneno. Basta uma conversa paciente, toda noite, até a dúvida virar casa.'],
+ {go:'casaj',x:10,face:1},{walk:120},
+ ['Narrador','Mostre a um homem que ninguém o olha nos olhos. Deixe um bilhete. Pinte uma pergunta na parede. Ele faz o resto.'],
+ {walk:236},()=>{S.flags.hatOff=1;S.actor='FARMNH'},{wait:1000},
+ ['Narrador','As crianças, não. Criança sabe que imaginação também é de verdade. Com elas não adianta conversar.'],
+ {walk:346},()=>{S.hideP=true;S.sit=true},{wait:2000},
+ ['Narrador','Será mesmo que existimos?'],['Narrador','Será que a solução está em ver as coisas de outro jeito?'],
+ ['Narrador','Somos reais… ou até mesmo eu estou sendo manipulado por alguém de fora?'],['Narrador','Ou até mesmo…'],
+ ()=>{S.catLap=true;G.A&&G.A.sfx('meow')},{wait:2400},()=>{S.front=true;G.zoom(346,106)},{wait:2000},['Narrador','Você.'],{wait:900}],()=>G.tvoff(G.credits));
+
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+G.credits=()=>{G.tvon();G.A&&G.A.music('sad');G.unzoom();const e=document.getElementById('end');e.style.display='flex';const min=Math.max(1,Math.round(S.play/60));const ok=Object.keys(S.facts).length>=4&&S.talks>=6;G.wipe();
+ e.innerHTML=`<div class="cred"><h1>NUTCASE P.I.</h1><p>Final: <b>${S.ending==='salvar'?'O peso da menina':'Deixar ir'}</b></p>
+ <p>Ideia e roteiro<br><b>você</b></p><p>Pixel art, código e conversas<br><b>Claude</b></p>
+ <p>Elenco<br><b>Otávio Brandão · Augusto e Helena Valente · Davi e Lia · Sebastião · Irmã Clara · Dona Rosa · Nina · Delegado Paiva · Mingau</b><br>e o Narrador, que esteve em todas as cenas</p>
+ <p>Tempo de jogo: ${min} min · Teorias erradas: ${S.wrong} · Dias usados: ${S.day}/30</p>
+ ${ok?'<p class="blink">…a TV ainda está quente.</p><button class="go" id="again">Ligar a TV de novo</button>':'<div class="file"><b>ARQUIVO #5 — INCOMPLETO</b><br>Ele ainda não sabe o bastante sobre você. Na próxima vez, converse mais com o detetive. Conte quem você é.</div><button class="go" id="again">Jogar de novo</button>'}</div>`;
+ document.getElementById('again').onclick=ok?G.secret:()=>location.reload()};
+G.secret=()=>{G.A&&G.A.music('none');document.getElementById('end').style.display='none';G.tvon();G.unzoom();Object.assign(S,{fire:false,burnt:false,hideP:false,sit:false,catLap:false,front:false,actor:'DET',coat:true});S.flags.paiva=0;S.flags.ring=0;
+ const f=S.facts,now=new Date(),min=Math.max(1,Math.round(S.play/60)),st=new Date(S.sess).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),hr=now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),wd=now.toLocaleDateString('pt-BR',{weekday:'long'});
+ const others=Object.keys(f).filter(k=>!['nome','idade','cidade'].includes(k)).map(k=>k+': '+f[k]);
+ const qs=S.quotes.filter(q=>q.length>8);const q=qs.length?qs[(Math.random()*qs.length)|0].slice(0,90):null;
+ const L=[{go:'office',x:170,face:1},{wait:800},
+  B(S.ending==='salvar'?'Morto, dizem os jornais. Mas enquanto você olha, eu continuo aqui.':'Afastado, dizem. Mas pra você eu nunca saí desta sala.'),
+  B('Arquivo número cinco. Homem sem registro. Que joga jogos.'),
+  B(`Nome: ${f.nome||'?'}. Idade: ${f.idade||'?'}. Mora em ${f.cidade||'algum lugar fora do mapa'}.`)];
+ if(others.length)L.push(B('Também anotei: '+others.join('; ')+'.'));
+ L.push(B(`Você ligou essa TV às ${st}. Agora são ${hr} de ${wd}. ${min} minutos comigo.`),
+  B(`Errou ${S.wrong} ${S.wrong===1?'teoria':'teorias'}. Decidiu por mim lá no fogo.`+(q?` E uma vez me disse: “${q}”.`:'')),
+  B('Trinta dias eu achei que alguém estava convencendo essa cidade de que ela não existe.'),
+  B('Mas quem conversou comigo todas as noites, quem viu tudo de fora, quem acreditou ou não em cada pista… foi você.'),
+  B('Então me responde, de verdade.'));
+ G.run(L,G.finalChat)};
+
+G.boot();
+})();
+
+</script>
+</body></html>
