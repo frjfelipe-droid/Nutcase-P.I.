@@ -166,6 +166,12 @@ input:focus{outline:2px solid var(--lamp)}
  <div id="end" class="full"></div>
 </div>
 <script>
+/* mostra qualquer erro na tela, para facilitar o diagnóstico */
+(function(){function show(m){try{var d=document.getElementById('errbox');if(!d){d=document.createElement('div');d.id='errbox';d.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:99;background:#3a0f0c;color:#ffd8d0;border:2px solid #b23a2e;padding:8px 10px;font:14px/1.3 monospace;border-radius:6px;white-space:pre-wrap';d.onclick=function(){d.remove()};(document.body||document.documentElement).appendChild(d)}d.textContent='Erro: '+m+'\n(toque para fechar)'}catch(e){}}
+window.addEventListener('error',function(e){show((e.message||'erro')+(e.filename?' — '+e.filename.split('/').pop()+':'+e.lineno:''))});
+window.addEventListener('unhandledrejection',function(e){var r=e.reason;if(r&&r.code==='not_granted')return;show('promessa: '+(r&&r.message||r))});})();
+</script>
+<script>
 /* Nutcase P.I. · áudio: música noir composta (piano, Rhodes, contrabaixo), ambiente suave e efeitos */
 (()=>{
 const G=window.G=window.G||{};
